@@ -1,9 +1,7 @@
 package knowledge
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
 	"os"
 	"sort"
 
@@ -54,8 +52,8 @@ func (s *Store) Search(query string, limit int) ([]SearchHit, error) {
 	for _, slug := range docDirs {
 		index, idxErr := s.ReadChunksIndex(slug)
 		if idxErr != nil {
-			slog.Warn("knowledge: corrupt CHUNKS.toml, falling back to full scan",
-				"slug", slug, "err", idxErr)
+			// Corrupt index — skip this document.
+			continue
 		}
 		if index != nil {
 			// Index path: use pre-computed term frequencies.
@@ -200,185 +198,4 @@ func readDirSafe(dir string) ([]os.DirEntry, error) {
 		return nil, nil
 	}
 	return des, err
-}
-
-// HybridSearch runs an embedding-based search over the knowledge base, then
-// reranks the top candidates with BM25. It returns results only if an embedder
-// is configured; otherwise it falls back to BM25-only Search.
-//
-// The embedding stage retrieves limit×5 candidates (max 100) by cosine
-// similarity, then the BM25 stage reranks and returns the top limit results.
-func (s *Store) HybridSearch(ctx context.Context, query string, limit int) ([]SearchHit, error) {
-	if s.embedder == nil {
-		return s.Search(query, limit)
-	}
-	if limit <= 0 {
-		limit = 8
-	}
-
-	queryTerms, err := retrieval.QueryTerms(query)
-	if err != nil {
-		return nil, fmt.Errorf("hybrid search: %w", err)
-	}
-
-	// Phase 1: embed the query.
-	queryVec, err := s.embedder.Embed(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("hybrid search: embed query: %w", err)
-	}
-
-	// Phase 2: scan all documents, collect embedding candidates.
-	type cand struct {
-		docSlug string
-		chunkID string
-		sim     float64 // cosine similarity
-	}
-	var candidates []cand
-
-	kd := s.knowledgeDir()
-	docDirs, err := listDocDirs(kd)
-	if err != nil {
-		return nil, fmt.Errorf("hybrid search: list documents: %w", err)
-	}
-
-	for _, slug := range docDirs {
-		ids, listErr := s.ListEmbeddingIDs(slug)
-		if listErr != nil || len(ids) == 0 {
-			continue
-		}
-		for _, id := range ids {
-			vec, readErr := s.ReadEmbedding(slug, id)
-			if readErr != nil {
-				continue
-			}
-			sim := cosineSimilarity(queryVec, vec)
-			if sim > 0 {
-				candidates = append(candidates, cand{
-					docSlug: slug,
-					chunkID: id,
-					sim:     sim,
-				})
-			}
-		}
-	}
-
-	if len(candidates) == 0 {
-		// No embedding candidates — fall back to BM25.
-		return s.Search(query, limit)
-	}
-
-	// Phase 3: sort by similarity descending and take top-K.
-	sort.Slice(candidates, func(i, j int) bool {
-		return candidates[i].sim > candidates[j].sim
-	})
-	k := limit * 5
-	if k > 100 {
-		k = 100
-	}
-	if k > len(candidates) {
-		k = len(candidates)
-	}
-	candidates = candidates[:k]
-
-	// Phase 4: build BM25 entries for candidates only.
-	entries := make([]searchEntry, len(candidates))
-	for i, c := range candidates {
-		entries[i] = searchEntry{
-			docSlug: c.docSlug,
-			chunkID: c.chunkID,
-		}
-		// Load term frequencies from index (preferred).
-		index, idxErr := s.ReadChunksIndex(c.docSlug)
-		if idxErr == nil && index != nil {
-			for _, e := range index.Chunks {
-				if e.ID == c.chunkID {
-					entries[i].terms = e.Terms
-					entries[i].termLen = e.TermCount
-					entries[i].section = e.Section
-					entries[i].offset = e.Offset
-					break
-				}
-			}
-		}
-		if entries[i].terms == nil {
-			// Fallback: read and tokenise.
-			text, readErr := s.ReadChunk(c.docSlug, c.chunkID)
-			if readErr != nil {
-				continue
-			}
-			tokens := retrieval.Tokens(text)
-			entries[i].text = text
-			entries[i].terms = retrieval.Counts(tokens)
-			entries[i].termLen = len(tokens)
-		}
-	}
-
-	// Phase 5: BM25 rerank.
-	docs := make([]map[string]int, len(entries))
-	lengths := make([]int, len(entries))
-	var totalLen int
-	for i, e := range entries {
-		if e.terms == nil {
-			continue
-		}
-		docs[i] = e.terms
-		lengths[i] = e.termLen
-		totalLen += e.termLen
-	}
-	if totalLen == 0 {
-		return s.Search(query, limit)
-	}
-	df := retrieval.DocumentFrequency(docs)
-	avgLen := float64(totalLen) / float64(len(entries))
-
-	type ranked struct {
-		entry searchEntry
-		score float64
-	}
-	var results []ranked
-	for i, e := range entries {
-		if e.terms == nil {
-			continue
-		}
-		s := retrieval.BM25Score(docs[i], lengths[i], queryTerms, df, len(entries), avgLen)
-		if s > 0 {
-			results = append(results, ranked{entry: e, score: s})
-		}
-	}
-
-	// Phase 6: sort by BM25 score.
-	sort.Slice(results, func(i, j int) bool {
-		return results[i].score > results[j].score
-	})
-	if len(results) > limit {
-		results = results[:limit]
-	}
-
-	// Phase 7: fill in text for snippet.
-	for i := range results {
-		if results[i].entry.text == "" {
-			text, readErr := s.ReadChunk(results[i].entry.docSlug, results[i].entry.chunkID)
-			if readErr != nil {
-				text = ""
-			}
-			results[i].entry.text = text
-		}
-	}
-
-	// Phase 8: build SearchHit slice.
-	hits := make([]SearchHit, len(results))
-	for i, r := range results {
-		hits[i] = SearchHit{
-			Score:   r.score,
-			DocSlug: r.entry.docSlug,
-			ChunkID: r.entry.chunkID,
-			Snippet: retrieval.MakeSnippet(r.entry.text, query, queryTerms, 200),
-			Section: r.entry.section,
-			Offset:  r.entry.offset,
-		}
-	}
-	if len(hits) == 0 {
-		return s.Search(query, limit)
-	}
-	return hits, nil
 }

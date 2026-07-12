@@ -20,14 +20,13 @@ func NewTool(store *Store) *Tool {
 func (t *Tool) Name() string { return "knowledge" }
 
 func (t *Tool) Description() string {
-	return "Search, read, list, upload, remove, diagnose, and rebuild index for documents in the project knowledge base. " +
+	return "Search, read, list, upload, and remove documents in the project knowledge base. " +
 		"When the user asks a domain-specific or technical question — especially about " +
 		"uploaded manuals, specifications, references, or standards — search the " +
 		"knowledge base FIRST with operation='search' before relying on general " +
 		"knowledge. Use 'read' to get the full text of a chunk that looks relevant; " +
 		"'list' to see all uploaded documents; 'upload' to ingest a document file; " +
-		"'remove' to delete a document and all its chunks; 'diagnose' to check " +
-		"document health; 'rebuild_index' to rebuild a corrupted CHUNKS.toml index."
+		"'remove' to delete a document and all its chunks."
 }
 
 func (t *Tool) ReadOnly() bool { return false }
@@ -39,8 +38,8 @@ func (t *Tool) Schema() json.RawMessage {
   "properties": {
     "operation": {
       "type": "string",
-      "enum": ["search", "read", "list", "upload", "remove", "diagnose", "rebuild_index"],
-      "description": "search = BM25 search across all chunked documents; read = read a specific chunk by docSlug/chunkID; list = list all uploaded documents; upload = ingest a document file; remove = delete a document and all its chunks; diagnose = check a document's health (meta, index, chunks); rebuild_index = rebuild corrupted CHUNKS.toml from chunk files"
+      "enum": ["search", "read", "list", "upload", "remove"],
+      "description": "search = BM25 search across all chunked documents; read = read a specific chunk by docSlug/chunkID; list = list all uploaded documents; upload = ingest a document file; remove = delete a document and its chunks"
     },
     "query": {
       "type": "string",
@@ -90,12 +89,8 @@ func (t *Tool) Execute(ctx context.Context, args json.RawMessage) (string, error
 		return t.upload(p)
 	case "remove":
 		return t.remove(p)
-	case "diagnose":
-		return t.diagnose(p)
-	case "rebuild_index":
-		return t.rebuildIndex(p)
 	default:
-		return "", fmt.Errorf("unknown operation %q, must be search|read|list|upload|remove|diagnose|rebuild_index", p.Operation)
+		return "", fmt.Errorf("unknown operation %q, must be search|read|list|upload|remove", p.Operation)
 	}
 }
 
@@ -181,27 +176,6 @@ func (t *Tool) upload(p knowledgeArgs) (string, error) {
 	}
 	return fmt.Sprintf("Document uploaded: %s (%d chunks, %d chars)",
 		meta.OriginalName, meta.ChunkCount, meta.TotalChars), nil
-}
-
-func (t *Tool) diagnose(p knowledgeArgs) (string, error) {
-	if p.DocSlug == "" {
-		return "", fmt.Errorf("docSlug is required for diagnose")
-	}
-	report, err := t.store.Diagnose(p.DocSlug)
-	if err != nil {
-		return "", err
-	}
-	return report, nil
-}
-
-func (t *Tool) rebuildIndex(p knowledgeArgs) (string, error) {
-	if p.DocSlug == "" {
-		return "", fmt.Errorf("docSlug is required for rebuild_index")
-	}
-	if err := t.store.RebuildIndex(p.DocSlug); err != nil {
-		return "", fmt.Errorf("rebuild index failed: %w", err)
-	}
-	return fmt.Sprintf("CHUNKS.toml rebuilt for document %q from chunk files.", p.DocSlug), nil
 }
 
 func (t *Tool) remove(p knowledgeArgs) (string, error) {
