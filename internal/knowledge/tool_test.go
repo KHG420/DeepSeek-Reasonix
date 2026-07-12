@@ -54,8 +54,8 @@ func TestTool_Schema(t *testing.T) {
 	if !ok {
 		t.Fatal("operation missing enum")
 	}
-	if len(enum) != 5 {
-		t.Errorf("expected 5 operations, got %d", len(enum))
+	if len(enum) != 7 {
+		t.Errorf("expected 7 operations, got %d", len(enum))
 	}
 }
 
@@ -214,6 +214,48 @@ func TestTool_Execute_RemoveMissingSlug(t *testing.T) {
 	_, err := tool.Execute(context.Background(), json.RawMessage(`{"operation":"remove"}`))
 	if err == nil {
 		t.Error("expected error for remove without docSlug")
+	}
+}
+
+func TestTool_Execute_Diagnose(t *testing.T) {
+	tool := newTestTool(t)
+	populateDoc(t, tool.store, "healthy", []string{"content"})
+
+	result, err := tool.Execute(context.Background(), json.RawMessage(`{"operation":"diagnose","docSlug":"healthy"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "OK") {
+		t.Errorf("diagnose should report healthy doc: %s", result)
+	}
+}
+
+func TestTool_Execute_DiagnoseMissingArgs(t *testing.T) {
+	tool := newTestTool(t)
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"operation":"diagnose"}`))
+	if err == nil {
+		t.Error("expected error for diagnose without docSlug")
+	}
+}
+
+func TestTool_Execute_RebuildIndex(t *testing.T) {
+	tool := newTestTool(t)
+	populateDoc(t, tool.store, "rebuild", []string{"chunk zero", "chunk one"})
+
+	result, err := tool.Execute(context.Background(), json.RawMessage(`{"operation":"rebuild_index","docSlug":"rebuild"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "rebuilt") {
+		t.Errorf("rebuild_index should confirm: %s", result)
+	}
+}
+
+func TestTool_Execute_RebuildIndexMissingArgs(t *testing.T) {
+	tool := newTestTool(t)
+	_, err := tool.Execute(context.Background(), json.RawMessage(`{"operation":"rebuild_index"}`))
+	if err == nil {
+		t.Error("expected error for rebuild_index without docSlug")
 	}
 }
 

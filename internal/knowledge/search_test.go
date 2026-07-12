@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -188,6 +189,71 @@ func TestSearch_EmptyQuery(t *testing.T) {
 	_, err := s.Search("   ", 10)
 	if err == nil {
 		t.Error("expected error for empty query")
+	}
+}
+
+func TestSearch_CorruptIndexFallsBack(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "corrupt", []string{"alpha beta gamma delta", "epsilon zeta eta theta"})
+
+	// Write a corrupt CHUNKS.toml (not valid TOML).
+	idxPath := s.ChunksIndexPath("corrupt")
+	if err := os.WriteFile(idxPath, []byte("this is not valid toml {{{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Search should still work via fallback (full scan of chunk files).
+	hits, err := s.Search("alpha beta", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit despite corrupt index")
+	}
+	// With fallback, Section/Offset should be zero values.
+	if hits[0].Section != "" {
+		t.Errorf("expected empty section for fallback after corrupt index, got %q", hits[0].Section)
+	}
+}
+
+func TestRebuildIndex(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "rebuild-me", []string{"chunk zero content", "chunk one with more text"})
+
+	// Write a corrupt index.
+	idxPath := s.ChunksIndexPath("rebuild-me")
+	if err := os.WriteFile(idxPath, []byte("garbage"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Rebuild the index.
+	if err := s.RebuildIndex("rebuild-me"); err != nil {
+		t.Fatal(err)
+	}
+
+	// Now the index should be readable.
+	index, err := s.ReadChunksIndex("rebuild-me")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if index == nil {
+		t.Fatal("expected non-nil index after rebuild")
+	}
+	if index.ChunkCount != 2 {
+		t.Errorf("expected 2 chunks, got %d", index.ChunkCount)
+	}
+}
+
+func TestDiagnose(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "healthy", []string{"some content"})
+
+	report, err := s.Diagnose("healthy")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(report, "OK") {
+		t.Errorf("healthy doc should report OK: %s", report)
 	}
 }
 

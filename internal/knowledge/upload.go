@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -64,6 +65,14 @@ func (s *Store) UploadDocument(path string) (DocumentMeta, error) {
 		_ = err
 	}
 
+	// Step 5b: optionally generate embeddings for hybrid search.
+	if s.embedder != nil {
+		if err := s.generateEmbeddings(context.Background(), slug, chunks); err != nil {
+			// Non-fatal: search will fall back to BM25-only.
+			_ = err
+		}
+	}
+
 	// Step 6: optionally copy source file for traceability.
 	if err := s.copySource(path, slug); err != nil {
 		// Non-fatal: the document is already ingested.
@@ -77,6 +86,64 @@ func (s *Store) UploadDocument(path string) (DocumentMeta, error) {
 	}
 
 	return meta, nil
+}
+
+// AppendToDocument appends text to an existing document in the knowledge base.
+// The text is chunked and appended to the existing chunks, and the index and
+// metadata are updated accordingly.
+func (s *Store) AppendToDocument(slug string, text string) error {
+	// Step 1: chunk the new text with position metadata.
+	chunksWithMeta := ChunkText(text)
+	if len(chunksWithMeta) == 0 {
+		return fmt.Errorf("append to %q: text produced no chunks (empty after chunking)", slug)
+	}
+
+	// Step 2: extract content strings for writing chunk files.
+	chunkStrings := make([]string, len(chunksWithMeta))
+	for i, c := range chunksWithMeta {
+		chunkStrings[i] = c.Content
+	}
+
+	// Step 3: append chunk files.
+	if err := s.AppendChunks(slug, chunkStrings); err != nil {
+		return fmt.Errorf("append to %q: write chunks: %w", slug, err)
+	}
+
+	// Step 4: append index entries.
+	if err := s.AppendChunksIndex(slug, chunksWithMeta); err != nil {
+		return fmt.Errorf("append to %q: update index: %w", slug, err)
+	}
+
+	// Step 5: update metadata.
+	meta, err := s.ReadMeta(slug)
+	if err != nil {
+		return fmt.Errorf("append to %q: read meta: %w", slug, err)
+	}
+	meta.ChunkCount += len(chunksWithMeta)
+	meta.TotalChars += len(text)
+	if err := s.WriteMeta(slug, meta); err != nil {
+		return fmt.Errorf("append to %q: write meta: %w", slug, err)
+	}
+
+	return nil
+}
+
+// generateEmbeddings computes and stores embeddings for all chunks of a document.
+func (s *Store) generateEmbeddings(ctx context.Context, slug string, chunks []string) error {
+	if s.embedder == nil {
+		return nil
+	}
+	if len(chunks) == 0 {
+		return nil
+	}
+	vectors, err := s.embedder.BatchEmbed(ctx, chunks)
+	if err != nil {
+		return fmt.Errorf("generate embeddings: %w", err)
+	}
+	if len(vectors) != len(chunks) {
+		return fmt.Errorf("embedder returned %d vectors for %d chunks", len(vectors), len(chunks))
+	}
+	return s.WriteEmbeddings(slug, vectors)
 }
 
 // copySource copies the original file into the document directory as source.<ext>.
