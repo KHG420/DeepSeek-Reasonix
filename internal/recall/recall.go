@@ -185,8 +185,12 @@ func (t *Tool) search(ctx context.Context, p recallArgs) (string, error) {
 		}
 		fmt.Fprintf(&b, "## Knowledge base (%d hit(s))\n", len(trimmed))
 		for i, hit := range trimmed {
-			fmt.Fprintf(&b, "%d. score=%.3f source=knowledge doc=%s chunk=%s\n   snippet: %s\n",
-				i+1, hit.Score, hit.DocSlug, hit.ChunkID, hit.Snippet)
+			sectionPart := ""
+			if hit.Section != "" {
+				sectionPart = fmt.Sprintf(" section=%s", hit.Section)
+			}
+			fmt.Fprintf(&b, "%d. score=%.3f source=knowledge doc=%s chunk=%s%s\n   snippet: %s\n",
+				i+1, hit.Score, hit.DocSlug, hit.ChunkID, sectionPart, hit.Snippet)
 		}
 		b.WriteString("\n")
 		totalHits += len(trimmed)

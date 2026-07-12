@@ -8,12 +8,15 @@ import (
 	"unicode/utf8"
 )
 
-// Tokens lowercases Latin words and splits CJK text into single-rune terms. It
-// is intentionally simple: a local, dependency-free approximation of FTS token
-// matching for saved agent history and memory.
+// Tokens lowercases Latin words and tokenises CJK text as unigrams + bigrams.
+// For example, "知识库" becomes ["知", "知识", "识库", "库"]. Latin words and
+// digits are emitted as single tokens; CJK bigrams improve phrase-level search
+// accuracy (e.g. "船舶" matches as a unit, not just "船" + "舶").
 func Tokens(s string) []string {
 	var out []string
 	var b strings.Builder
+	var prevCJK rune // previous CJK character for bigram generation
+
 	flush := func() {
 		if b.Len() == 0 {
 			return
@@ -25,10 +28,18 @@ func Tokens(s string) []string {
 		switch {
 		case isCJK(r):
 			flush()
+			// Unigram: the single character itself.
 			out = append(out, string(r))
+			// Bigram: combine with previous CJK character.
+			if prevCJK != 0 {
+				out = append(out, string(prevCJK)+string(r))
+			}
+			prevCJK = r
 		case unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_':
+			prevCJK = 0
 			b.WriteRune(unicode.ToLower(r))
 		default:
+			prevCJK = 0
 			flush()
 		}
 	}

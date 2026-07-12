@@ -115,6 +115,72 @@ func TestSearch_Limit(t *testing.T) {
 	}
 }
 
+func TestSearch_IndexPath(t *testing.T) {
+	s := tempStore(t)
+	populateDocWithIndex(t, s, "index-test", []string{
+		"The quick brown fox jumps over the lazy dog near the river bank.",
+		"A completely different topic about machine learning and neural networks.",
+		"Another paragraph about the fox and its habitat in the forest.",
+	}, []string{
+		"## Introduction",
+		"## Methods",
+		"## Results",
+	}, []int{0, 100, 250})
+
+	// Search via index path — should produce same ranking as fallback but with
+	// Section and Offset populated.
+	hits, err := s.Search("fox river", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit for 'fox river'")
+	}
+	// Chunk 000 should rank first (mentions both fox and river).
+	if hits[0].ChunkID != "000" {
+		t.Errorf("expected chunk 000 to rank first, got %s (score=%.2f)", hits[0].ChunkID, hits[0].Score)
+	}
+	// Section and Offset should be populated from the index.
+	if hits[0].Section != "## Introduction" {
+		t.Errorf("expected section '## Introduction', got %q", hits[0].Section)
+	}
+	if hits[0].Offset != 0 {
+		t.Errorf("expected offset 0, got %d", hits[0].Offset)
+	}
+	// Snippet should still be generated from the actual chunk text.
+	if !strings.Contains(hits[0].Snippet, "fox") {
+		t.Errorf("snippet should contain 'fox': %q", hits[0].Snippet)
+	}
+}
+
+func TestSearch_IndexPathFallback(t *testing.T) {
+	// A document without CHUNKS.toml should still be searchable via the
+	// fallback (full-scan) path.
+	s := tempStore(t)
+	populateDoc(t, s, "no-index", []string{
+		"alpha beta gamma delta",
+		"epsilon zeta eta theta",
+	})
+
+	hits, err := s.Search("alpha beta", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit")
+	}
+	if hits[0].ChunkID != "000" {
+		t.Errorf("expected chunk 000 to rank first, got %s (score=%.2f)", hits[0].ChunkID, hits[0].Score)
+	}
+	// Without index, Section/Offset should be zero values.
+	if hits[0].Section != "" {
+		t.Errorf("expected empty section for fallback, got %q", hits[0].Section)
+	}
+	if hits[0].Offset != 0 {
+		t.Errorf("expected zero offset for fallback, got %d", hits[0].Offset)
+	}
+}
+
 func TestSearch_EmptyQuery(t *testing.T) {
 	s := tempStore(t)
 	populateDoc(t, s, "empty-query", []string{"some content here"})
@@ -139,6 +205,30 @@ func populateDoc(t *testing.T, s *Store, slug string, chunks []string) {
 		TotalChars:   totalLen(chunks),
 	}
 	if err := s.WriteMeta(slug, meta); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// populateDocWithIndex is like populateDoc but also writes a CHUNKS.toml
+// index so Search can exercise the index fast path. Sections and offsets are
+// passed per chunk; pass nil slices to leave them empty.
+func populateDocWithIndex(t *testing.T, s *Store, slug string, chunks []string, sections []string, offsets []int) {
+	t.Helper()
+	populateDoc(t, s, slug, chunks)
+
+	chunkMetas := make([]ChunkWithMeta, len(chunks))
+	for i, c := range chunks {
+		sec := ""
+		if i < len(sections) {
+			sec = sections[i]
+		}
+		off := 0
+		if i < len(offsets) {
+			off = offsets[i]
+		}
+		chunkMetas[i] = ChunkWithMeta{Content: c, Section: sec, Offset: off}
+	}
+	if err := s.writeChunksIndexFromMeta(slug, chunkMetas); err != nil {
 		t.Fatal(err)
 	}
 }

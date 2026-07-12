@@ -8,7 +8,7 @@ import (
 
 func TestTokensHandlesLatinAndCJK(t *testing.T) {
 	got := Tokens("BM25 检索 cache-first")
-	want := []string{"bm25", "检", "索", "cache", "first"}
+	want := []string{"bm25", "检", "索", "检索", "cache", "first"}
 	if strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("Tokens() = %#v, want %#v", got, want)
 	}

@@ -57,6 +57,8 @@ type SearchHit struct {
 	DocSlug string
 	ChunkID string
 	Snippet string // whitespace-compacted excerpt centered on the query
+	Section string // nearest markdown heading above this chunk (from CHUNKS.toml)
+	Offset  int    // character offset in the original document text (0-based)
 }
 
 // ChunksIndex is the per-document search index persisted in CHUNKS.toml. It
