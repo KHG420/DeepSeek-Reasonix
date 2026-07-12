@@ -1,6 +1,7 @@
 package knowledge
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -528,4 +529,445 @@ func totalLen(chunks []string) int {
 		n += len(c)
 	}
 	return n
+}
+
+// --------------- G6: SearchDocuments ---------------
+
+func TestSearchDocuments_NoDocs(t *testing.T) {
+	s := tempStore(t)
+	docs, err := s.SearchDocuments("anything", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 0 {
+		t.Errorf("expected 0 docs, got %d", len(docs))
+	}
+}
+
+func TestSearchDocuments_SingleDoc(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "single-doc", []string{
+		"The quick brown fox jumps over the lazy dog near the river bank.",
+		"A completely different topic about machine learning and neural networks.",
+		"Another paragraph about the fox and its habitat in the forest.",
+	})
+
+	docs, err := s.SearchDocuments("fox river", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 1 {
+		t.Fatalf("expected 1 doc, got %d", len(docs))
+	}
+	if docs[0].DocSlug != "single-doc" {
+		t.Errorf("expected slug single-doc, got %s", docs[0].DocSlug)
+	}
+	if docs[0].Score <= 0 {
+		t.Errorf("expected positive MaxP score, got %.4f", docs[0].Score)
+	}
+	if len(docs[0].TopChunks) == 0 || len(docs[0].TopChunks) > 3 {
+		t.Errorf("expected 1-3 top chunks, got %d", len(docs[0].TopChunks))
+	}
+	// TopChunks should be sorted by score descending.
+	for i := 1; i < len(docs[0].TopChunks); i++ {
+		if docs[0].TopChunks[i].Score > docs[0].TopChunks[i-1].Score {
+			t.Errorf("TopChunks not sorted descending: idx %d > idx %d", i, i-1)
+		}
+	}
+}
+
+func TestSearchDocuments_MultiDoc(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "doc-alpha", []string{
+		"alpha specific content about quantum physics and entanglement",
+	})
+	populateDoc(t, s, "doc-beta", []string{
+		"beta content about classical mechanics and newtonian physics",
+		"beta second paragraph about physics laws",
+	})
+	// Third document unrelated.
+	populateDoc(t, s, "doc-gamma", []string{
+		"cooking recipes and kitchen tips",
+	})
+
+	docs, err := s.SearchDocuments("physics quantum", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Should find doc-alpha (direct match on quantum) and doc-beta (physics match).
+	if len(docs) < 2 {
+		t.Fatalf("expected at least 2 docs, got %d", len(docs))
+	}
+	// doc-alpha should rank first (higher score).
+	if docs[0].DocSlug != "doc-alpha" {
+		t.Errorf("expected doc-alpha first, got %s", docs[0].DocSlug)
+	}
+	// doc-gamma should not appear.
+	for _, d := range docs {
+		if d.DocSlug == "doc-gamma" {
+			t.Errorf("unexpected doc-gamma in results")
+		}
+	}
+}
+
+func TestSearchDocuments_Limit(t *testing.T) {
+	s := tempStore(t)
+	for i := 0; i < 5; i++ {
+		slug := fmt.Sprintf("doc-%d", i)
+		populateDoc(t, s, slug, []string{
+			strings.Repeat("common topic word ", 15),
+		})
+	}
+
+	docs, err := s.SearchDocuments("common topic", 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) > 3 {
+		t.Errorf("expected at most 3 docs, got %d", len(docs))
+	}
+}
+
+func TestSearchDocuments_EmptyQuery(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "empty-query", []string{"some content here"})
+
+	_, err := s.SearchDocuments("   ", 10)
+	if err == nil {
+		t.Error("expected error for empty query")
+	}
+}
+
+func TestSearchDocuments_WithFilter(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "doc-foo", []string{"machine learning content"})
+	populateDoc(t, s, "doc-bar", []string{"deep learning content"})
+
+	docs, err := s.SearchDocuments("learning", 10, SearchFilter{DocSlug: "doc-foo"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 1 {
+		t.Fatalf("expected 1 doc, got %d", len(docs))
+	}
+	if docs[0].DocSlug != "doc-foo" {
+		t.Errorf("expected doc-foo, got %s", docs[0].DocSlug)
+	}
+}
+
+// --------------- G5: Adaptive RRF ---------------
+
+func TestDetectQueryType_Question(t *testing.T) {
+	qtype := detectQueryType("what is a neural network")
+	if qtype != "conceptual" {
+		t.Errorf("expected conceptual for question, got %q", qtype)
+	}
+}
+
+func TestDetectQueryType_QuestionMark(t *testing.T) {
+	qtype := detectQueryType("How does RAG work?")
+	if qtype != "conceptual" {
+		t.Errorf("expected conceptual for '?', got %q", qtype)
+	}
+}
+
+func TestDetectQueryType_VerbHeavy(t *testing.T) {
+	qtype := detectQueryType("explain how to implement RAG retrieval")
+	if qtype != "conceptual" {
+		t.Errorf("expected conceptual for verb-heavy, got %q", qtype)
+	}
+}
+
+func TestDetectQueryType_NounHeavy(t *testing.T) {
+	qtype := detectQueryType("BM25 neural network Transformer embedding")
+	if qtype != "factual" {
+		t.Errorf("expected factual for noun-heavy, got %q", qtype)
+	}
+}
+
+func TestDetectQueryType_ShortQuery(t *testing.T) {
+	qtype := detectQueryType("RAG")
+	if qtype != "factual" {
+		t.Errorf("expected factual for short query, got %q", qtype)
+	}
+}
+
+func TestDetectQueryType_Balanced(t *testing.T) {
+	qtype := detectQueryType("the team has the data")
+	if qtype != "balanced" {
+		t.Errorf("expected balanced, got %q", qtype)
+	}
+}
+
+func TestAdaptiveRRFWeight_Conceptual(t *testing.T) {
+	alpha := adaptiveRRFWeight("explain how RAG works")
+	if alpha != 0.4 {
+		t.Errorf("expected 0.4 for conceptual, got %.1f", alpha)
+	}
+}
+
+func TestAdaptiveRRFWeight_Factual(t *testing.T) {
+	alpha := adaptiveRRFWeight("neural network Transformer embedding")
+	if alpha != 0.6 {
+		t.Errorf("expected 0.6 for factual, got %.1f", alpha)
+	}
+}
+
+func TestAdaptiveRRFWeight_Balanced(t *testing.T) {
+	alpha := adaptiveRRFWeight("the team has the data")
+	if alpha != 0.5 {
+		t.Errorf("expected 0.5 for balanced, got %.1f", alpha)
+	}
+}
+
+// --------------- G9: Snippet dedup ---------------
+
+func TestSnippetJaccard_Identical(t *testing.T) {
+	a := "the quick brown fox"
+	b := "the quick brown fox"
+	j := snippetJaccard(a, b)
+	if j != 1.0 {
+		t.Errorf("expected 1.0 for identical snippets, got %.2f", j)
+	}
+}
+
+func TestSnippetJaccard_Disjoint(t *testing.T) {
+	a := "the quick brown fox"
+	b := "machine learning neural networks"
+	j := snippetJaccard(a, b)
+	if j != 0.0 {
+		t.Errorf("expected 0.0 for disjoint snippets, got %.2f", j)
+	}
+}
+
+func TestSnippetJaccard_Partial(t *testing.T) {
+	a := "the quick brown fox"
+	b := "the quick brown dog"
+	j := snippetJaccard(a, b)
+	// 3 common words (the, quick, brown), total union of 5 words.
+	if j < 0.5 || j > 0.7 {
+		t.Errorf("expected ~0.6 for partial overlap, got %.2f", j)
+	}
+}
+
+func TestSnippetJaccard_Empty(t *testing.T) {
+	if j := snippetJaccard("", "something"); j != 0.0 {
+		t.Errorf("expected 0.0 for empty input, got %.2f", j)
+	}
+	if j := snippetJaccard("something", ""); j != 0.0 {
+		t.Errorf("expected 0.0 for empty input, got %.2f", j)
+	}
+	if j := snippetJaccard("", ""); j != 0.0 {
+		t.Errorf("expected 0.0 for both empty, got %.2f", j)
+	}
+}
+
+func TestDeduplicateSnippets_SameDocOverlap(t *testing.T) {
+	// Two hits from the same document with nearly identical snippets.
+	snippet := "the quick brown fox jumps over the lazy dog"
+	hits := []SearchHit{
+		{Score: 5.0, DocSlug: "doc", ChunkID: "000", Snippet: snippet},
+		{Score: 3.0, DocSlug: "doc", ChunkID: "001", Snippet: snippet},
+	}
+	result := deduplicateSnippets(hits)
+	// The lower score (index 1) should be marked as duplicate.
+	if result[1].DuplicateOf != "000" {
+		t.Errorf("expected DuplicateOf=000 for lower-scored hit, got %q", result[1].DuplicateOf)
+	}
+	// The higher score (index 0) should NOT be marked.
+	if result[0].DuplicateOf != "" {
+		t.Errorf("expected no DuplicateOf on higher-scored hit, got %q", result[0].DuplicateOf)
+	}
+}
+
+func TestDeduplicateSnippets_DifferentDocs(t *testing.T) {
+	// Hits from different documents should not be marked as duplicates.
+	snippet := "the quick brown fox"
+	hits := []SearchHit{
+		{Score: 5.0, DocSlug: "doc-a", ChunkID: "000", Snippet: snippet},
+		{Score: 4.0, DocSlug: "doc-b", ChunkID: "001", Snippet: snippet},
+	}
+	result := deduplicateSnippets(hits)
+	for i, h := range result {
+		if h.DuplicateOf != "" {
+			t.Errorf("hit %d from different doc should not be duplicate, got DuplicateOf=%q", i, h.DuplicateOf)
+		}
+	}
+}
+
+func TestDeduplicateSnippets_AlreadyMarked(t *testing.T) {
+	// Already-marked hits should be skipped.
+	hits := []SearchHit{
+		{Score: 5.0, DocSlug: "doc", ChunkID: "000", Snippet: "fox jumps over"},
+		{Score: 4.0, DocSlug: "doc", ChunkID: "001", Snippet: "fox jumps over", DuplicateOf: "000"},
+	}
+	result := deduplicateSnippets(hits)
+	// Should not re-process the already-marked hit.
+	if result[1].DuplicateOf != "000" {
+		t.Errorf("expected DuplicateOf=000 to be preserved, got %q", result[1].DuplicateOf)
+	}
+}
+
+func TestDeduplicateSnippets_EdgeCase(t *testing.T) {
+	// Empty hits slice should not panic.
+	result := deduplicateSnippets(nil)
+	if result != nil {
+		t.Errorf("expected nil for empty input, got %v", result)
+	}
+}
+
+func TestDeduplicateSnippets_DifferentSnippets(t *testing.T) {
+	// Different snippets from the same doc should NOT be marked.
+	hits := []SearchHit{
+		{Score: 5.0, DocSlug: "doc", ChunkID: "000", Snippet: "the quick brown fox"},
+		{Score: 4.0, DocSlug: "doc", ChunkID: "001", Snippet: "machine learning neural networks"},
+	}
+	result := deduplicateSnippets(hits)
+	for i, h := range result {
+		if h.DuplicateOf != "" {
+			t.Errorf("hit %d with different snippet should not be duplicate, got DuplicateOf=%q", i, h.DuplicateOf)
+		}
+	}
+}
+
+// --------------- G14: Coarse-to-fine search ---------------
+
+func TestCoarseToFineSearch_NoSections(t *testing.T) {
+	// Documents without section info should return all entries unchanged.
+	s := tempStore(t)
+	populateDoc(t, s, "no-sec", []string{
+		"the quick brown fox jumps over the lazy dog",
+		"machine learning and neural networks",
+	})
+
+	hits, err := s.Search("fox", 10, SearchFilter{Coarse: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit for coarse search without sections")
+	}
+	if hits[0].DocSlug != "no-sec" {
+		t.Errorf("expected hit from 'no-sec', got %q", hits[0].DocSlug)
+	}
+}
+
+func TestCoarseToFineSearch_WithSections(t *testing.T) {
+	s := tempStore(t)
+	populateDocWithIndex(t, s, "sec-doc", []string{
+		"Introduction to artificial intelligence machine learning.",
+		"Methods for machine learning with deep neural networks.",
+		"Results of machine learning experiments show improvement.",
+		"Conclusion: machine learning advances rapidly.",
+	}, []string{
+		"## Introduction",
+		"## Methods",
+		"## Results",
+		"## Conclusion",
+	}, []int{0, 100, 250, 400})
+
+	// Create section chunks so coarse-to-fine can read them.
+	secChunks := []ChunkWithMeta{
+		{Content: "Introduction to artificial intelligence machine learning.", Section: "## Introduction", Offset: 0, SectionID: "## Introduction"},
+		{Content: "Methods for machine learning with deep neural networks.", Section: "## Methods", Offset: 100, SectionID: "## Methods"},
+		{Content: "Results of machine learning experiments show improvement.", Section: "## Results", Offset: 250, SectionID: "## Results"},
+		{Content: "Conclusion: machine learning advances rapidly.", Section: "## Conclusion", Offset: 400, SectionID: "## Conclusion"},
+	}
+	if err := s.WriteSectionChunks("sec-doc", secChunks); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update CHUNKS.toml to include SectionChunkID references.
+	index, idxErr := s.ReadChunksIndex("sec-doc")
+	if idxErr != nil || index == nil {
+		t.Fatal("expected chunks index")
+	}
+	for i := range index.Chunks {
+		secID := fmt.Sprintf("S%02d", i)
+		index.Chunks[i].SectionChunkID = secID
+	}
+	if err := s.WriteChunksIndex("sec-doc", index); err != nil {
+		t.Fatal(err)
+	}
+
+	// Search without coarse filter — should return all chunks that match.
+	allHits, err := s.Search("machine learning", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(allHits) < 2 {
+		t.Fatalf("expected at least 2 hits without coarse filter for 'machine learning', got %d", len(allHits))
+	}
+
+	// Search with coarse filter — should still return results.
+	coarseHits, err := s.Search("machine learning", 10, SearchFilter{Coarse: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(coarseHits) == 0 {
+		t.Fatal("expected at least one hit with coarse filter")
+	}
+	// All hits should be from the same document.
+	for _, h := range coarseHits {
+		if h.DocSlug != "sec-doc" {
+			t.Errorf("expected all hits from 'sec-doc', got %q", h.DocSlug)
+		}
+	}
+}
+
+func TestCoarseToFineSearch_Hybrid(t *testing.T) {
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+
+	populateDocWithIndex(t, s, "hybrid-sec", []string{
+		"The quick brown fox jumps over the lazy dog near the river bank.",
+		"Machine learning and neural networks for artificial intelligence.",
+		"Results of experiments on reinforcement learning algorithms.",
+	}, []string{
+		"## Animals",
+		"## AI Methods",
+		"## Experiments",
+	}, []int{0, 100, 250})
+
+	// Write section chunks with SectionChunkID.
+	secChunks := []ChunkWithMeta{
+		{Content: "The quick brown fox jumps over the lazy dog near the river bank.", Section: "## Animals", Offset: 0, SectionID: "## Animals"},
+		{Content: "Machine learning and neural networks for artificial intelligence.", Section: "## AI Methods", Offset: 100, SectionID: "## AI Methods"},
+		{Content: "Results of experiments on reinforcement learning algorithms.", Section: "## Experiments", Offset: 250, SectionID: "## Experiments"},
+	}
+	if err := s.WriteSectionChunks("hybrid-sec", secChunks); err != nil {
+		t.Fatal(err)
+	}
+
+	// Link fine chunks to sections.
+	index, idxErr := s.ReadChunksIndex("hybrid-sec")
+	if idxErr != nil || index == nil {
+		t.Fatal("expected chunks index")
+	}
+	for i := range index.Chunks {
+		secID := fmt.Sprintf("S%02d", i)
+		index.Chunks[i].SectionChunkID = secID
+	}
+	if err := s.WriteChunksIndex("hybrid-sec", index); err != nil {
+		t.Fatal(err)
+	}
+
+	// HybridSearch with coarse filter should work.
+	hits, err := s.HybridSearch("machine learning neural", 10, SearchFilter{Coarse: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit from hybrid coarse search")
+	}
+}
+
+func TestCoarseToFineSearch_EmptyQuery(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "empty-coarse", []string{"some content"})
+
+	_, err := s.Search("   ", 10, SearchFilter{Coarse: true})
+	if err == nil {
+		t.Error("expected error for empty query with coarse filter")
+	}
 }

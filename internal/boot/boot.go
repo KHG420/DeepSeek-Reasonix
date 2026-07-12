@@ -325,6 +325,7 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	// model the tool exists; it NEVER loads document content into the prefix, so
 	// adding/removing documents keeps the cache warm.
 	knowledgeStore := knowledge.NewStore(root)
+	knowledgeStore.SetRewriter(knowledge.NewSynonymRewriter())
 	sysPrompt += "\n\n" + config.KnowledgeBasePolicy
 
 	// Skills: discover playbooks (built-in + project/custom/global) and fold their

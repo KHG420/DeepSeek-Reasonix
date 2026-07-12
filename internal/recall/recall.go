@@ -39,8 +39,8 @@ func (t *Tool) Description() string {
 		"Use this as the FIRST retrieval step when the user asks a question " +
 		"that might be answered by either source — it returns results from both, " +
 		"each labelled with its source (memory or knowledge), so you can decide " +
-		"which to follow up on. Use operation='search' to run a combined BM25 " +
-		"search; use operation='list' to see available memories and documents."
+		"which to follow up on. Use operation='search' to run a combined hybrid " +
+		"(BM25 + dense) search; use operation='list' to see available memories and documents."
 }
 
 func (t *Tool) ReadOnly() bool { return true }
@@ -53,7 +53,7 @@ func (t *Tool) Schema() json.RawMessage {
     "operation": {
       "type": "string",
       "enum": ["search", "list"],
-      "description": "search = combined BM25 search across memories and knowledge base; list = list available memories and documents"
+      "description": "search = combined hybrid (BM25 + dense) search across memories and knowledge base; list = list available memories and documents"
     },
     "query": {
       "type": "string",
@@ -140,7 +140,7 @@ func (t *Tool) search(ctx context.Context, p recallArgs) (string, error) {
 	}()
 
 	go func() {
-		hits, err := t.kbStore.Search(query, limit)
+		hits, err := t.kbStore.HybridSearch(query, limit)
 		kbCh <- kbResult{hits: hits, err: err}
 	}()
 

@@ -274,3 +274,10 @@ func (s *Store) SetReranker(r Reranker) {
 func (s *Store) SetEmbedder(e Embedder) {
 	s.embedder = e
 }
+
+// SetSearchLogger configures an optional search logger on the store. When set,
+// every Search/HybridSearch call records query metadata to the logger. A nil
+// logger is silently ignored.
+func (s *Store) SetSearchLogger(l SearchLogger) {
+	s.searchLogger = l
+}

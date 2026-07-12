@@ -66,6 +66,7 @@ func (s *Store) UploadDocument(path string) (DocumentMeta, error) {
 		meta.Title = title
 		meta.Authors = authors
 		meta.Abstract = abstract
+		meta.IsPaper = true
 	}
 
 	// Step 4: persist chunks, section chunks, and metadata.

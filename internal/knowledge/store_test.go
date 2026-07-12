@@ -314,4 +314,113 @@ func TestExists(t *testing.T) {
 	}
 }
 
+// --------------- G12: Incremental boundary merge ---------------
+
+func TestAppendDocumentText_BoundaryMerge(t *testing.T) {
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+
+	// Create initial document with content that is semantically similar.
+	initialChunks := []string{
+		"Artificial intelligence is transforming how we interact with technology.",
+		"Machine learning algorithms now power everything from search engines to recommendation systems.",
+	}
+	if err := s.WriteChunks("doc", initialChunks); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WriteMeta("doc", DocumentMeta{
+		OriginalName: "doc.md",
+		SourceType:   "md",
+		ChunkCount:   len(initialChunks),
+		TotalChars:   len(initialChunks[0]) + len(initialChunks[1]),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	meta, err := s.ReadMeta("doc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialCount := meta.ChunkCount
+	if initialCount == 0 {
+		t.Fatal("expected at least one chunk after upload")
+	}
+
+	// Append similar text that may merge with the last chunk.
+	appendText := "Deep neural networks have revolutionized computer vision and natural language processing. " +
+		"These advances build on decades of research in artificial intelligence and machine learning."
+	added, err := s.AppendDocumentText("doc", appendText)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// After merge, we may have fewer new chunks than without an embedder.
+	// But we should still have some content appended or merged.
+	meta2, err := s.ReadMeta("doc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta2.ChunkCount <= initialCount {
+		t.Errorf("expected chunk count to increase after append, was %d, now %d", initialCount, meta2.ChunkCount)
+	}
+	// If no new chunks were added (all merged), added should be 0 and count unchanged.
+	// But some should have survived unless content was fully redundant.
+	if added < 0 {
+		t.Errorf("negative added chunks: %d", added)
+	}
+}
+
+func TestAppendDocumentText_BoundaryMergeNoEmbedder(t *testing.T) {
+	// Without an embedder, boundary merge should be skipped and
+	// AppendDocumentText should work exactly as before.
+	s := tempStore(t)
+
+	initialChunks := []string{"AI is transforming technology."}
+	if err := s.WriteChunks("doc", initialChunks); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.WriteMeta("doc", DocumentMeta{
+		OriginalName: "doc.md",
+		SourceType:   "md",
+		ChunkCount:   len(initialChunks),
+		TotalChars:   len(initialChunks[0]),
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	meta, err := s.ReadMeta("doc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialCount := meta.ChunkCount
+
+	appendText := "Machine learning powers recommendation systems."
+	added, err := s.AppendDocumentText("doc", appendText)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	meta2, err := s.ReadMeta("doc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if meta2.ChunkCount != initialCount+added {
+		t.Errorf("expected %d chunks after append without merge, got %d", initialCount+added, meta2.ChunkCount)
+	}
+	if added <= 0 {
+		t.Errorf("expected at least 1 new chunk without embedder, got %d", added)
+	}
+}
+
+func TestAppendDocumentText_NewDocument(t *testing.T) {
+	// First append to a non-existent document should fail.
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+
+	_, err := s.AppendDocumentText("nonexistent", "some text")
+	if err == nil {
+		t.Error("expected error for non-existent document")
+	}
+}
+
 func chunkID(i int) string { return fmt.Sprintf("%03d", i) }

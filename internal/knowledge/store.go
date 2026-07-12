@@ -2,8 +2,11 @@ package knowledge
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,20 +18,25 @@ import (
 	"reasonix/internal/retrieval"
 )
 
-const maxTermsPerChunk = 200 // top-N frequent terms retained in CHUNKS.toml
+const maxTermsPerChunk = 50 // top-N frequent terms retained in CHUNKS.toml
+
+const boundaryMergeN = 5 // G12: number of old tail chunks for incremental boundary merge
+const boundaryMergeM = 5 // G12: number of new head chunks for incremental boundary merge
 
 // Store manages the on-disk knowledge base under .reasonix/knowledge/.
 type Store struct {
-	root     string // workspace root (contains .reasonix/)
-	rewriter QueryRewriter
-	embedder Embedder
-	reranker Reranker
+	root         string // workspace root (contains .reasonix/)
+	rewriter     QueryRewriter
+	embedder     Embedder
+	reranker     Reranker
+	searchLogger SearchLogger
+	AbstractBoost float64 // G13: multiplier for abstract-section chunks in papers (default 1.1)
 }
 
 // NewStore returns a Store rooted at workspaceRoot. The caller must ensure
 // workspaceRoot/.reasonix/ exists (it always does in a Reasonix project).
 func NewStore(workspaceRoot string) *Store {
-	return &Store{root: workspaceRoot}
+	return &Store{root: workspaceRoot, AbstractBoost: 1.1}
 }
 
 // knowledgeDir returns the path to .reasonix/knowledge/.
@@ -193,6 +201,10 @@ func (s *Store) AppendChunksIndex(slug string, newEntries []ChunkIndexEntry) err
 	}
 	index.Chunks = append(index.Chunks, newEntries...)
 	index.ChunkCount = len(index.Chunks)
+	cs, csErr := s.computeChunksChecksum(slug)
+	if csErr == nil {
+		index.Checksum = cs
+	}
 	return s.WriteChunksIndex(slug, index)
 }
 
@@ -212,7 +224,85 @@ func (s *Store) AppendDocumentText(slug string, newText string) (int, error) {
 		return 0, nil // nothing to append
 	}
 
-	// Step 1: write chunk files.
+	// G12: Incremental boundary merge — when an embedder is configured and
+	// there are existing chunks, perform semantic merging at the boundary
+	// between old tail and new head chunks.
+	oldModified := map[string]string{} // chunkID (e.g. "005") → new content for modified old chunks
+	if meta.ChunkCount > 0 && s.embedder != nil {
+		n := boundaryMergeN
+		m := boundaryMergeM
+		if m > len(fineChunks) {
+			m = len(fineChunks)
+		}
+
+		// Read last N old chunks.
+		startOld := meta.ChunkCount - n
+		if startOld < 0 {
+			startOld = 0
+		}
+		var oldTail []ChunkWithMeta
+		for i := startOld; i < meta.ChunkCount; i++ {
+			id := fmt.Sprintf("%03d", i)
+			content, readErr := s.ReadChunk(slug, id)
+			if readErr != nil {
+				continue
+			}
+			oldTail = append(oldTail, ChunkWithMeta{Content: content})
+		}
+
+		if len(oldTail) > 0 && m > 0 {
+			newHead := fineChunks[:m]
+			boundary := append(oldTail, newHead...)
+
+			merged, mergeErr := MergeSemanticNeighbors(context.Background(), boundary, s.embedder, defaultSemanticThreshold)
+			if mergeErr == nil {
+				// Detect changes to old chunks (content modified = absorbed new content).
+				for j := 0; j < len(oldTail) && j < len(merged); j++ {
+					if merged[j].Content != oldTail[j].Content {
+						oldModified[fmt.Sprintf("%03d", startOld+j)] = merged[j].Content
+					}
+				}
+
+				// Rewrite modified old chunk files.
+				for idx, content := range oldModified {
+					if writeErr := os.WriteFile(s.ChunkPath(slug, idx), []byte(content), 0o644); writeErr != nil {
+						// Non-fatal: continue with best-effort merge.
+						delete(oldModified, idx)
+					}
+				}
+
+				// Determine which new chunks survived (appear after oldTail in merged output).
+				if len(merged) > len(oldTail) {
+					survivedNew := merged[len(oldTail):]
+					survivedMap := make(map[string]bool, len(survivedNew))
+					for _, sc := range survivedNew {
+						survivedMap[sc.Content] = true
+					}
+
+					// Filter fineChunks to survivors, preserving order.
+					filtered := make([]ChunkWithMeta, 0, len(survivedNew))
+					for _, fc := range fineChunks {
+						if survivedMap[fc.Content] {
+							delete(survivedMap, fc.Content)
+							filtered = append(filtered, fc)
+						}
+					}
+					fineChunks = filtered
+
+					// If fineChunks changed and coarse chunks exist, rebuild them.
+					if len(fineChunks) > 0 && len(coarseChunks) > 0 {
+						coarseChunks = rebuildCoarseFromFine(fineChunks)
+					}
+				} else {
+					// All new chunks were absorbed — nothing to append.
+					return 0, nil
+				}
+			}
+			// If merge fails, continue with original fineChunks (non-fatal).
+		}
+	}
+
+	// Step 1: write new chunk files.
 	chunks := make([]string, len(fineChunks))
 	for i, c := range fineChunks {
 		chunks[i] = c.Content
@@ -221,13 +311,49 @@ func (s *Store) AppendDocumentText(slug string, newText string) (int, error) {
 		return 0, fmt.Errorf("append chunks: %w", err)
 	}
 
-	// Step 2: append section-level chunks if any.
+	// Step 2: rewrite section-level chunks.
 	if len(coarseChunks) > 0 {
 		_ = s.WriteSectionChunks(slug, coarseChunks)
 	}
 
-	// Step 3: build index entries for the new chunks.
-	var newEntries []ChunkIndexEntry
+	// Step 3: build index entries — update modified old entries and append new entries.
+	// Instead of AppendChunksIndex, we read-modify-write to handle old entry updates.
+	index, idxErr := s.ReadChunksIndex(slug)
+	if idxErr != nil || index == nil {
+		index = &ChunksIndex{
+			Slug:       slug,
+			ChunkCount: 0,
+			Chunks:     nil,
+		}
+	}
+
+	// Update index entries for modified old chunks.
+	if len(oldModified) > 0 {
+		entryByID := make(map[string]int)
+		for i, e := range index.Chunks {
+			entryByID[e.ID] = i
+		}
+		for chunkID, content := range oldModified {
+			tokens := retrieval.Tokens(content)
+			tc := retrieval.Counts(tokens)
+			replacement := ChunkIndexEntry{
+				ID:        chunkID,
+				TermCount: len(tokens),
+				Terms:     trimTopTerms(tc, maxTermsPerChunk),
+			}
+			// Preserve original metadata (section, offset, vector, etc).
+			if pos, ok := entryByID[chunkID]; ok {
+				replacement.Section = index.Chunks[pos].Section
+				replacement.Offset = index.Chunks[pos].Offset
+				replacement.Vector = index.Chunks[pos].Vector
+				replacement.SectionChunkID = index.Chunks[pos].SectionChunkID
+				replacement.SectionRole = index.Chunks[pos].SectionRole
+				index.Chunks[pos] = replacement
+			}
+		}
+	}
+
+	// Build and append index entries for surviving new chunks.
 	for i, c := range fineChunks {
 		id := fmt.Sprintf("%03d", meta.ChunkCount+i)
 		tokens := retrieval.Tokens(c.Content)
@@ -243,10 +369,15 @@ func (s *Store) AppendDocumentText(slug string, newText string) (int, error) {
 		if c.SectionID != "" {
 			entry.SectionChunkID = c.SectionID
 		}
-		newEntries = append(newEntries, entry)
+		index.Chunks = append(index.Chunks, entry)
 	}
-	if err := s.AppendChunksIndex(slug, newEntries); err != nil {
-		return 0, fmt.Errorf("append chunks index: %w", err)
+	index.ChunkCount = len(index.Chunks)
+	cs, csErr := s.computeChunksChecksum(slug)
+	if csErr == nil {
+		index.Checksum = cs
+	}
+	if err := s.WriteChunksIndex(slug, index); err != nil {
+		return 0, fmt.Errorf("write chunks index: %w", err)
 	}
 
 	// Step 4: update meta.json.
@@ -257,6 +388,46 @@ func (s *Store) AppendDocumentText(slug string, newText string) (int, error) {
 	}
 
 	return len(fineChunks), nil
+}
+
+// rebuildCoarseFromFine rebuilds section-level (coarse) chunks from the given
+// fine chunks, grouping by section heading and concatenating content.
+// This is used by G12 to regenerate coarse chunks after boundary merge removes
+// some fine chunks.
+func rebuildCoarseFromFine(fine []ChunkWithMeta) []ChunkWithMeta {
+	if len(fine) == 0 {
+		return nil
+	}
+	// Group by section heading.
+	sectionGroups := map[string][]ChunkWithMeta{}
+	sectionOrder := []string{}
+	for _, c := range fine {
+		sec := c.Section
+		if _, exists := sectionGroups[sec]; !exists {
+			sectionOrder = append(sectionOrder, sec)
+		}
+		sectionGroups[sec] = append(sectionGroups[sec], c)
+	}
+
+	var coarse []ChunkWithMeta
+	for _, sec := range sectionOrder {
+		group := sectionGroups[sec]
+		var b strings.Builder
+		for j, c := range group {
+			if j > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString(c.Content)
+		}
+		coarse = append(coarse, ChunkWithMeta{
+			Content:     b.String(),
+			Section:     sec,
+			Offset:      group[0].Offset,
+			SectionID:   sec,
+			SectionRole: classifySectionRole(sec),
+		})
+	}
+	return coarse
 }
 
 // WriteSectionChunks writes section-level chunks into chunks/sections/.
@@ -325,6 +496,30 @@ func (s *Store) ListChunks(slug string) ([]string, error) {
 			ids = append(ids, strings.TrimSuffix(name, ".md"))
 		}
 	}
+	return ids, nil
+}
+
+// ListSectionChunks returns all section chunk IDs for a document, sorted.
+func (s *Store) ListSectionChunks(slug string) ([]string, error) {
+	dir := s.SectionsDir(slug)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("read sections dir for %q: %w", slug, err)
+	}
+	var ids []string
+	for _, e := range entries {
+		if e.IsDir() {
+			continue
+		}
+		name := e.Name()
+		if strings.HasSuffix(name, ".md") {
+			ids = append(ids, strings.TrimSuffix(name, ".md"))
+		}
+	}
+	sort.Strings(ids)
 	return ids, nil
 }
 
@@ -402,25 +597,101 @@ func (s *Store) WriteChunksIndex(slug string, index *ChunksIndex) error {
 	if err := toml.NewEncoder(f).Encode(index); err != nil {
 		return fmt.Errorf("encode CHUNKS.toml: %w", err)
 	}
+	// G7: update the global inverted index. Non-fatal: a failure here doesn't
+	// block search; it falls back to the full-scan path.
+	if err := s.updateInvertedIndex(slug, index.Chunks); err != nil {
+		// Non-fatal: inverted index update failure doesn't block search.
+		// The next search will fall back to full scan.
+	}
 	return nil
 }
 
 // ReadChunksIndex reads and decodes a document's CHUNKS.toml. It returns nil
 // and no error when the file does not exist, so callers can fall back to a
 // full scan of chunk files.
+//
+// Backward compatibility: old-format indices (with map[string]int Terms) are
+// detected and converted to the current []termFreq format on read.
+// When a checksum is present (G10), chunk files are verified and the index
+// is automatically rebuilt if they have drifted.
 func (s *Store) ReadChunksIndex(slug string) (*ChunksIndex, error) {
-	f, err := os.Open(s.ChunksIndexPath(slug))
+	data, err := os.ReadFile(s.ChunksIndexPath(slug))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("open CHUNKS.toml: %w", err)
+		return nil, fmt.Errorf("read CHUNKS.toml: %w", err)
 	}
-	defer f.Close()
+
+	// Try new format first ([]termFreq Terms).
 	var index ChunksIndex
-	if _, err := toml.NewDecoder(f).Decode(&index); err != nil {
-		return nil, fmt.Errorf("decode CHUNKS.toml: %w", err)
+	if _, err := toml.Decode(string(data), &index); err == nil {
+		// G10: verify checksum if present and auto-rebuild on mismatch.
+		if index.Checksum != "" {
+			actualCS, csErr := s.computeChunksChecksum(slug)
+			if csErr == nil && actualCS != index.Checksum {
+				// Checksum mismatch: rebuild index from chunk files.
+				rebuilt, rebuildErr := rebuildIndexFromChunks(s, slug)
+				if rebuildErr == nil {
+					return rebuilt, nil
+				}
+			}
+		}
+		return &index, nil
 	}
+
+	// Fall back to old format (map[string]int Terms).
+	type ChunkIndexEntryV1 struct {
+		ID             string         `toml:"id"`
+		TermCount      int            `toml:"term_count"`
+		Terms          map[string]int `toml:"terms"`
+		Section        string         `toml:"section"`
+		Offset         int            `toml:"offset"`
+		Vector         []float64      `toml:"vector,omitempty"`
+		SectionChunkID string         `toml:"section_chunk_id,omitempty"`
+		SectionRole    string         `toml:"section_role,omitempty"`
+	}
+	type ChunksIndexV1 struct {
+		Slug       string              `toml:"slug"`
+		ChunkCount int                 `toml:"chunk_count"`
+		VectorDim  int                 `toml:"vector_dim,omitempty"`
+		HasVectors bool                `toml:"has_vectors,omitempty"`
+		Chunks     []ChunkIndexEntryV1 `toml:"chunks"`
+	}
+
+	var indexV1 ChunksIndexV1
+	if _, err := toml.Decode(string(data), &indexV1); err != nil {
+		return nil, fmt.Errorf("decode CHUNKS.toml (tried both formats): %w", err)
+	}
+
+	// Convert V1 (map[string]int) to current format ([]termFreq).
+	index = ChunksIndex{
+		Slug:       indexV1.Slug,
+		ChunkCount: indexV1.ChunkCount,
+		VectorDim:  indexV1.VectorDim,
+		HasVectors: indexV1.HasVectors,
+		Chunks:     make([]ChunkIndexEntry, len(indexV1.Chunks)),
+	}
+	for i, c := range indexV1.Chunks {
+		terms := make([]termFreq, 0, len(c.Terms))
+		for term, count := range c.Terms {
+			terms = append(terms, termFreq{Term: term, Count: count})
+		}
+		sort.Slice(terms, func(i, j int) bool {
+			return terms[i].Count > terms[j].Count
+		})
+		index.Chunks[i] = ChunkIndexEntry{
+			ID:             c.ID,
+			TermCount:      c.TermCount,
+			Terms:          terms,
+			Section:        c.Section,
+			Offset:         c.Offset,
+			Vector:         c.Vector,
+			SectionChunkID: c.SectionChunkID,
+			SectionRole:    c.SectionRole,
+		}
+	}
+
 	return &index, nil
 }
 
@@ -491,6 +762,10 @@ func (s *Store) writeChunksIndexFromMetaWithSections(slug string, chunks []Chunk
 			entry.Vector = vec64
 		}
 		index.Chunks[i] = entry
+	}
+	cs, csErr := s.computeChunksChecksum(slug)
+	if csErr == nil {
+		index.Checksum = cs
 	}
 	if err := s.WriteChunksIndex(slug, index); err != nil {
 		return fmt.Errorf("write CHUNKS.toml: %w", err)
@@ -600,11 +875,14 @@ func chunkIDToInt(chunkID string) int {
 }
 
 // trimTopTerms keeps only the top n terms with the highest counts, reducing
-// the size of the CHUNKS.toml index. When counts is nil or already ≤ n,
-// it returns the input unchanged.
-func trimTopTerms(counts map[string]int, n int) map[string]int {
-	if counts == nil || len(counts) <= n {
-		return counts
+// the size of the CHUNKS.toml index. Returns a []termFreq slice sorted by
+// count descending. When counts is nil, returns nil.
+func trimTopTerms(counts map[string]int, n int) []termFreq {
+	if counts == nil {
+		return nil
+	}
+	if len(counts) == 0 {
+		return []termFreq{}
 	}
 	type kv struct {
 		k string
@@ -620,9 +898,97 @@ func trimTopTerms(counts map[string]int, n int) map[string]int {
 	if n > len(sorted) {
 		n = len(sorted)
 	}
-	out := make(map[string]int, n)
+	out := make([]termFreq, 0, n)
 	for _, p := range sorted[:n] {
-		out[p.k] = p.v
+		out = append(out, termFreq{Term: p.k, Count: p.v})
 	}
 	return out
+}
+
+// computeChunksChecksum computes a SHA256 checksum over all chunk files for a
+// document, sorted by chunk ID. Returns the hex-encoded hash.
+func (s *Store) computeChunksChecksum(slug string) (string, error) {
+	ids, err := s.ListChunks(slug)
+	if err != nil {
+		return "", fmt.Errorf("list chunks: %w", err)
+	}
+	sort.Strings(ids)
+	h := sha256.New()
+	for _, id := range ids {
+		data, readErr := os.ReadFile(s.ChunkPath(slug, id))
+		if readErr != nil {
+			return "", fmt.Errorf("read chunk %s: %w", id, readErr)
+		}
+		io.WriteString(h, id)
+		h.Write(data)
+	}
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
+// rebuildIndexFromChunks scans all chunk files for a document and rebuilds the
+// CHUNKS.toml index from scratch. Section/Offset/Vector metadata from the
+// existing index is preserved when available; otherwise those fields are left
+// empty.
+func rebuildIndexFromChunks(s *Store, slug string) (*ChunksIndex, error) {
+	ids, err := s.ListChunks(slug)
+	if err != nil {
+		return nil, fmt.Errorf("list chunks: %w", err)
+	}
+	sort.Strings(ids)
+
+	// Read existing CHUNKS.toml directly (not via ReadChunksIndex, to avoid
+	// recursive checksum verification).
+	oldIndex := (*ChunksIndex)(nil)
+	if data, readErr := os.ReadFile(s.ChunksIndexPath(slug)); readErr == nil {
+		var directIndex ChunksIndex
+		if _, decErr := toml.Decode(string(data), &directIndex); decErr == nil {
+			oldIndex = &directIndex
+		}
+	}
+	oldMeta := map[string]ChunkIndexEntry{}
+	if oldIndex != nil {
+		for _, e := range oldIndex.Chunks {
+			oldMeta[e.ID] = e
+		}
+	}
+
+	index := &ChunksIndex{
+		Slug:       slug,
+		ChunkCount: len(ids),
+		Chunks:     make([]ChunkIndexEntry, len(ids)),
+	}
+
+	for i, id := range ids {
+		data, readErr := os.ReadFile(s.ChunkPath(slug, id))
+		if readErr != nil {
+			continue
+		}
+		content := string(data)
+		tokens := retrieval.Tokens(content)
+		tc := retrieval.Counts(tokens)
+
+		entry := ChunkIndexEntry{
+			ID:        id,
+			TermCount: len(tokens),
+			Terms:     trimTopTerms(tc, maxTermsPerChunk),
+		}
+		if old, ok := oldMeta[id]; ok {
+			entry.Section = old.Section
+			entry.Offset = old.Offset
+			entry.Vector = old.Vector
+			entry.SectionChunkID = old.SectionChunkID
+			entry.SectionRole = old.SectionRole
+		}
+		index.Chunks[i] = entry
+	}
+
+	cs, csErr := s.computeChunksChecksum(slug)
+	if csErr == nil {
+		index.Checksum = cs
+	}
+
+	if writeErr := s.WriteChunksIndex(slug, index); writeErr != nil {
+		return nil, fmt.Errorf("write rebuilt index: %w", writeErr)
+	}
+	return index, nil
 }

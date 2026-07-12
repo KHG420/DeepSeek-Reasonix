@@ -38,6 +38,7 @@ type DocumentMeta struct {
 	Title        string    `json:"title,omitempty"`    // extracted paper title (C1)
 	Authors      []string  `json:"authors,omitempty"`  // extracted paper authors (C1)
 	Abstract     string    `json:"abstract,omitempty"` // extracted abstract text (C1)
+	IsPaper      bool      `json:"is_paper,omitempty"` // true when looksLikePaper(text) during upload (G13)
 }
 
 // Chunk is a single paragraph-level slice of a document, stored as 000.md etc.
@@ -66,15 +67,43 @@ type SearchHit struct {
 	Section     string // nearest markdown heading above this chunk (from CHUNKS.toml)
 	Offset      int    // character offset in the original document text (0-based)
 	SectionRole string // classified section role, e.g. "abstract", "introduction" (C2)
+	DuplicateOf string // if non-empty, this hit is an approximate duplicate of chunkID (G9)
 }
 
 // SearchFilter holds optional filters for narrowing a knowledge base search.
-// When a field is the zero value (empty string / 0), the filter is not applied.
+// When a field is the zero value (empty string / 0 / false), the filter is not applied.
 // Multiple filters are AND-ed together.
 type SearchFilter struct {
 	DocSlug    string // if non-empty, only search documents with this exact slug
 	SourceType string // if non-empty, only search documents with this source type
 	Section    string // if non-empty, only include chunks whose section contains this string (substring match)
+	Coarse     bool   // G14: enable coarse-to-fine search (2-phase: section-level then fine-grained)
+}
+
+// DocumentHit is a ranked document result from SearchDocuments. It groups
+// chunk-level results by document using MaxP (maximum chunk score per doc).
+type DocumentHit struct {
+	Score     float64 // MaxP score (highest chunk score for this doc)
+	DocSlug   string
+	DocMeta   DocumentMeta // full metadata from meta.json
+	TopChunks []SearchHit  // top-3 representative chunks, sorted by score descending
+}
+
+// termFreq is a single term-count pair for TOML serialization. Using a struct
+// array instead of map[string]int reduces CHUNKS.toml size by ~60%.
+type termFreq struct {
+	Term  string `toml:"term"`
+	Count int    `toml:"count"`
+}
+
+// termFreqsToMap converts a []termFreq slice back to a map[string]int for the
+// search pipeline (which uses maps for O(1) term lookup).
+func termFreqsToMap(freqs []termFreq) map[string]int {
+	m := make(map[string]int, len(freqs))
+	for _, tf := range freqs {
+		m[tf.Term] = tf.Count
+	}
+	return m
 }
 
 // ChunksIndex is the per-document search index persisted in CHUNKS.toml. It
@@ -87,18 +116,19 @@ type ChunksIndex struct {
 	ChunkCount int               `toml:"chunk_count"`
 	VectorDim  int               `toml:"vector_dim,omitempty"`
 	HasVectors bool              `toml:"has_vectors,omitempty"`
+	Checksum   string            `toml:"checksum,omitempty"` // SHA256 of chunks/*.md files (G10)
 	Chunks     []ChunkIndexEntry `toml:"chunks"`
 }
 
 // ChunkIndexEntry holds the pre-computed term frequencies, position
 // metadata, and optional dense vector for one chunk.
 type ChunkIndexEntry struct {
-	ID             string         `toml:"id"`
-	TermCount      int            `toml:"term_count"`
-	Terms          map[string]int `toml:"terms"`
-	Section        string         `toml:"section"`
-	Offset         int            `toml:"offset"`
-	Vector         []float64      `toml:"vector,omitempty"`
-	SectionChunkID string         `toml:"section_chunk_id,omitempty"` // points to the parent section-level chunk (e.g. "S00")
-	SectionRole    string         `toml:"section_role,omitempty"`     // classified role: "abstract", "introduction", etc. (C2)
+	ID             string     `toml:"id"`
+	TermCount      int        `toml:"term_count"`
+	Terms          []termFreq `toml:"terms"`
+	Section        string     `toml:"section"`
+	Offset         int        `toml:"offset"`
+	Vector         []float64  `toml:"vector,omitempty"`
+	SectionChunkID string     `toml:"section_chunk_id,omitempty"` // points to the parent section-level chunk (e.g. "S00")
+	SectionRole    string     `toml:"section_role,omitempty"`     // classified role: "abstract", "introduction", etc. (C2)
 }
