@@ -1549,6 +1549,17 @@ const LanguagePolicy = `Reply in the same language the user is using in their mo
 	`whenever they switch. Let this also guide the language you think in. Always keep code, ` +
 	`identifiers, file paths, shell commands, and technical terms in their original form — never translate them.`
 
+// KnowledgeBasePolicy is appended to the system prompt when a knowledge base
+// store is available. It is static text so it stays cache-stable regardless of
+// what documents are uploaded or removed.
+const KnowledgeBasePolicy = "You have access to a project knowledge base — documents the user has " +
+	"uploaded (manuals, specifications, references, standards, research papers). " +
+	"Before answering a domain-specific or technical question from general knowledge, " +
+	"search the knowledge base FIRST with the `knowledge` tool — treat it as the " +
+	"authoritative source when it has relevant content. Use operation='search' with " +
+	"keywords from the user's question; if a snippet looks relevant, use 'read' to " +
+	"get the full text before answering."
+
 // Default returns the built-in default configuration.
 func Default() *Config {
 	return &Config{

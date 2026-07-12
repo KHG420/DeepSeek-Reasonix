@@ -23,8 +23,8 @@ func TestTool_Name(t *testing.T) {
 
 func TestTool_Description(t *testing.T) {
 	tool := newTestTool(t)
-	if !strings.Contains(tool.Description(), "BM25") {
-		t.Error("Description should mention BM25")
+	if !strings.Contains(tool.Description(), "domain-specific") {
+		t.Error("Description should guide when to search the knowledge base")
 	}
 }
 

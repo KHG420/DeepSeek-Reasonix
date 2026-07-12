@@ -21,9 +21,12 @@ func (t *Tool) Name() string { return "knowledge" }
 
 func (t *Tool) Description() string {
 	return "Search, read, list, upload, and remove documents in the project knowledge base. " +
-		"Use operation='search' to find relevant chunks by BM25 text retrieval; " +
-		"'read' to read a specific chunk; 'list' to see all uploaded documents; " +
-		"'upload' to ingest a document file; 'remove' to delete a document and all its chunks."
+		"When the user asks a domain-specific or technical question — especially about " +
+		"uploaded manuals, specifications, references, or standards — search the " +
+		"knowledge base FIRST with operation='search' before relying on general " +
+		"knowledge. Use 'read' to get the full text of a chunk that looks relevant; " +
+		"'list' to see all uploaded documents; 'upload' to ingest a document file; " +
+		"'remove' to delete a document and all its chunks."
 }
 
 func (t *Tool) ReadOnly() bool { return false }
