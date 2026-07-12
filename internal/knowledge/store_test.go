@@ -157,6 +157,103 @@ func TestReadChunkNotFound(t *testing.T) {
 	}
 }
 
+func TestReadChunkContext(t *testing.T) {
+	s := tempStore(t)
+	chunks := []string{"zero", "one", "two", "three", "four"}
+	if err := s.WriteChunks("doc", chunks); err != nil {
+		t.Fatal(err)
+	}
+
+	// context=0 → just the chunk.
+	got, err := s.ReadChunkContext("doc", "002", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != "two" {
+		t.Errorf("context=0: got %q, want 'two'", got)
+	}
+
+	// context=1 → [001] one, [002] two, [003] three.
+	got, err = s.ReadChunkContext("doc", "002", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "[001]") || !strings.Contains(got, "[002]") || !strings.Contains(got, "[003]") {
+		t.Errorf("context=1: got %q, want chunks 001-003", got)
+	}
+	if strings.Contains(got, "[000]") || strings.Contains(got, "[004]") {
+		t.Errorf("context=1: unexpected chunks outside window: %s", got)
+	}
+
+	// context=1 at edge (first chunk).
+	got, err = s.ReadChunkContext("doc", "000", 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "[000]") || !strings.Contains(got, "[001]") {
+		t.Errorf("edge context: got %q, want chunks 000-001", got)
+	}
+	if strings.Contains(got, "[002]") {
+		t.Errorf("edge context: unexpected chunk 002: %s", got)
+	}
+}
+
+func TestReadChunkContextWithSections(t *testing.T) {
+	s := tempStore(t)
+	chunks := []string{"intro paragraph one", "intro paragraph two", "body one", "body two", "conclusion"}
+	if err := s.WriteChunks("doc", chunks); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write a CHUNKS.toml with section metadata.
+	index := &ChunksIndex{
+		Slug:       "doc",
+		ChunkCount: 5,
+		Chunks: []ChunkIndexEntry{
+			{ID: "000", Section: "Introduction"},
+			{ID: "001", Section: "Introduction"},
+			{ID: "002", Section: "Body"},
+			{ID: "003", Section: "Body"},
+			{ID: "004", Section: "Conclusion"},
+		},
+	}
+	if err := s.WriteChunksIndex("doc", index); err != nil {
+		t.Fatal(err)
+	}
+
+	// context=1 at chunk 002 (body) → should show Introduction, Body, Conclusion sections.
+	got, err := s.ReadChunkContext("doc", "002", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Should use section headers, not [NNN] markers.
+	if strings.Contains(got, "[000]") || strings.Contains(got, "[001]") {
+		t.Errorf("expected section headers, got chunk markers: %s", got)
+	}
+
+	// Should contain section headers.
+	if !strings.Contains(got, "## Introduction") {
+		t.Errorf("missing Introduction header: %s", got)
+	}
+	if !strings.Contains(got, "## Body") {
+		t.Errorf("missing Body header: %s", got)
+	}
+	if !strings.Contains(got, "## Conclusion") {
+		t.Errorf("missing Conclusion header: %s", got)
+	}
+
+	// Same-section chunks merged without extra header or separator between them.
+	introCount := strings.Count(got, "## Introduction")
+	if introCount != 1 {
+		t.Errorf("Introduction header should appear once, got %d: %s", introCount, got)
+	}
+	bodyCount := strings.Count(got, "## Body")
+	if bodyCount != 1 {
+		t.Errorf("Body header should appear once, got %d: %s", bodyCount, got)
+	}
+}
+
 func TestListDocuments(t *testing.T) {
 	s := tempStore(t)
 	// No docs initially.

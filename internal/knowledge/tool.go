@@ -53,6 +53,10 @@ func (t *Tool) Schema() json.RawMessage {
       "type": "string",
       "description": "Chunk identifier (e.g. '005') for operation='read'. From search results."
     },
+    "context": {
+      "type": "integer",
+      "description": "Number of adjacent chunks to include before and after the target chunk for operation='read'. Default 0 (just the chunk itself). Max 5."
+    },
     "filePath": {
       "type": "string",
       "description": "Absolute or workspace-relative path to the document file for operation='upload'."
@@ -97,6 +101,7 @@ type knowledgeArgs struct {
 	Query     string `json:"query"`
 	DocSlug   string `json:"docSlug"`
 	ChunkID   string `json:"chunkID"`
+	Context   int    `json:"context"`
 	FilePath  string `json:"filePath"`
 	Limit     int    `json:"limit"`
 }
@@ -132,7 +137,14 @@ func (t *Tool) read(p knowledgeArgs) (string, error) {
 	if p.ChunkID == "" {
 		return "", fmt.Errorf("chunkID is required for read")
 	}
-	text, err := t.store.ReadChunk(p.DocSlug, p.ChunkID)
+	ctx := p.Context
+	if ctx < 0 {
+		ctx = 0
+	}
+	if ctx > 5 {
+		ctx = 5
+	}
+	text, err := t.store.ReadChunkContext(p.DocSlug, p.ChunkID, ctx)
 	if err != nil {
 		return "", err
 	}

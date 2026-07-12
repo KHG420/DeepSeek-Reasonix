@@ -72,7 +72,7 @@ approval and returns the live tool directory. MCP tool rules remain exact;
 `ask`, `explore`, `forget`, `history`, `install_skill`, `install_source`,
 `knowledge`, `list_sessions`, `lsp_definition`, `lsp_diagnostics`, `lsp_hover`,
 `lsp_references`, `memory`, `parallel_tasks`, `read_only_skill`,
-`read_only_task`, `read_session`, `read_skill`, `remember`, `research`,
+`read_only_task`, `read_session`, `read_skill`, `recall`, `remember`, `research`,
 `review`, `run_skill`, `security_review`, `slash_command`, `task`.
 
 Delivery only: `use_capability` (`action` = `inspect` | `call` | `decline`).
@@ -87,7 +87,7 @@ In token economy mode, Reasonix starts with the core coding/session/memory tools
 and the connector used to enable optional sources on demand:
 
 `ask`, `connect_tool_source`, `forget`, `history`, `knowledge`, `list_sessions`, `memory`,
-`read_session`, `remember`, `slash_command`.
+`read_session`, `recall`, `remember`, `slash_command`.
 
 Core built-in tools such as `bash`, `read_file`, `grep`, file writers, job tools,
 and `todo_write` remain available in economy mode and are listed in the built-in

@@ -66,7 +66,7 @@ func (t recallTool) Execute(ctx context.Context, args json.RawMessage) (string, 
 	limit := clampRecallLimit(in.Limit)
 	switch strings.TrimSpace(in.Operation) {
 	case "search":
-		hits, err := searchMemories(ctx, t.store, in.Query, memType, limit)
+		hits, err := SearchMemories(ctx, t.store, in.Query, memType, limit)
 		if err != nil {
 			return "", err
 		}
@@ -78,7 +78,7 @@ func (t recallTool) Execute(ctx context.Context, args json.RawMessage) (string, 
 		}
 		return formatMemory(t.store, m), nil
 	case "list":
-		return formatMemoryList(t.store, filterMemories(t.store.List(), memType), limit), nil
+		return formatMemoryList(t.store, FilterMemories(t.store.List(), memType), limit), nil
 	case "":
 		return "", fmt.Errorf("operation is required")
 	default:
@@ -88,7 +88,7 @@ func (t recallTool) Execute(ctx context.Context, args json.RawMessage) (string, 
 
 func (recallTool) ReadOnly() bool { return true }
 
-type memoryHit struct {
+type MemoryHit struct {
 	Memory  Memory
 	Path    string
 	Score   float64
@@ -103,7 +103,7 @@ type memoryDoc struct {
 	length int
 }
 
-func searchMemories(ctx context.Context, store Store, query string, typ Type, limit int) ([]memoryHit, error) {
+func SearchMemories(ctx context.Context, store Store, query string, typ Type, limit int) ([]MemoryHit, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, fmt.Errorf("query is required")
@@ -112,7 +112,7 @@ func searchMemories(ctx context.Context, store Store, query string, typ Type, li
 	if err != nil {
 		return nil, err
 	}
-	memories := filterMemories(store.List(), typ)
+	memories := FilterMemories(store.List(), typ)
 	docs := make([]memoryDoc, 0, len(memories))
 	for _, m := range memories {
 		if err := ctx.Err(); err != nil {
@@ -143,13 +143,13 @@ func searchMemories(ctx context.Context, store Store, query string, typ Type, li
 	df := retrieval.DocumentFrequency(counts)
 	avgLen := float64(totalLen) / float64(len(docs))
 
-	var hits []memoryHit
+	var hits []MemoryHit
 	for _, doc := range docs {
 		score := retrieval.BM25Score(doc.counts, doc.length, queryTerms, df, len(docs), avgLen)
 		if score <= 0 {
 			continue
 		}
-		hits = append(hits, memoryHit{
+		hits = append(hits, MemoryHit{
 			Memory:  doc.memory,
 			Path:    doc.path,
 			Score:   score,
@@ -162,7 +162,7 @@ func searchMemories(ctx context.Context, store Store, query string, typ Type, li
 		}
 		return hits[i].Score > hits[j].Score
 	})
-	hits = retrieval.KeepTopRelativeScore(hits, recallScoreFloor, func(hit memoryHit) float64 {
+	hits = retrieval.KeepTopRelativeScore(hits, recallScoreFloor, func(hit MemoryHit) float64 {
 		return hit.Score
 	})
 	if len(hits) > limit {
@@ -182,7 +182,9 @@ func recallTypeFilter(s string) (Type, error) {
 	return t, nil
 }
 
-func filterMemories(memories []Memory, typ Type) []Memory {
+// FilterMemories returns memories matching the given type, or all memories when
+// typ is empty.
+func FilterMemories(memories []Memory, typ Type) []Memory {
 	if typ == "" {
 		return memories
 	}
@@ -218,7 +220,7 @@ func memorySearchText(m Memory) string {
 	}, "\n")
 }
 
-func formatMemoryHits(query string, hits []memoryHit) string {
+func formatMemoryHits(query string, hits []MemoryHit) string {
 	if len(hits) == 0 {
 		return strings.Join([]string{
 			"No saved memories matched " + strconvQuote(query) + ".",

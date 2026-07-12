@@ -99,6 +99,40 @@ func TestTool_Execute_ReadMissingArgs(t *testing.T) {
 	}
 }
 
+func TestTool_Execute_ReadWithContext(t *testing.T) {
+	tool := newTestTool(t)
+	populateDoc(t, tool.store, "doc", []string{"chunk zero", "chunk one", "chunk two", "chunk three"})
+
+	// context=1 around "002" should include 001, 002, 003.
+	args := json.RawMessage(`{"operation":"read","docSlug":"doc","chunkID":"002","context":1}`)
+	result, err := tool.Execute(context.Background(), args)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(result, "[001]") || !strings.Contains(result, "[002]") || !strings.Contains(result, "[003]") {
+		t.Errorf("read with context: got %q, want chunks 001-003", result)
+	}
+	if strings.Contains(result, "[000]") {
+		t.Errorf("read with context: unexpected chunk 000: %s", result)
+	}
+}
+
+func TestTool_SchemaHasContext(t *testing.T) {
+	tool := newTestTool(t)
+	schema := tool.Schema()
+	var m map[string]interface{}
+	if err := json.Unmarshal(schema, &m); err != nil {
+		t.Fatalf("Schema is not valid JSON: %v", err)
+	}
+	props, ok := m["properties"].(map[string]interface{})
+	if !ok {
+		t.Fatal("Schema missing properties")
+	}
+	if _, ok := props["context"]; !ok {
+		t.Error("Schema missing 'context' property for read pagination")
+	}
+}
+
 func TestTool_Execute_List(t *testing.T) {
 	tool := newTestTool(t)
 	populateDoc(t, tool.store, "doc-a", []string{"a"})

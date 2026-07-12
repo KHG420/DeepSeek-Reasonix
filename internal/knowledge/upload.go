@@ -10,10 +10,11 @@ import (
 
 // UploadDocument ingests a file into the knowledge base:
 //  1. ParseFile extracts the full text.
-//  2. ChunkText splits it into paragraph-level chunks.
+//  2. ChunkText splits it into paragraph-level chunks with position metadata.
 //  3. Chunks are written as NNN.md under .reasonix/knowledge/<slug>/chunks/.
 //  4. Metadata is written to meta.json.
-//  5. INDEX.md is updated with a link to the new document.
+//  5. CHUNKS.toml search index is written with position metadata.
+//  6. INDEX.md is updated with a link to the new document.
 //
 // The original file is NOT copied into the knowledge base by this method; the
 // caller is responsible for preserving source.<ext> if desired. Returns the
@@ -25,10 +26,16 @@ func (s *Store) UploadDocument(path string) (DocumentMeta, error) {
 		return DocumentMeta{}, fmt.Errorf("upload: parse: %w", err)
 	}
 
-	// Step 2: chunk.
-	chunks := ChunkText(text)
-	if len(chunks) == 0 {
+	// Step 2: chunk with position metadata.
+	chunksWithMeta := ChunkText(text)
+	if len(chunksWithMeta) == 0 {
 		return DocumentMeta{}, fmt.Errorf("upload: document produced no chunks (empty after parsing)")
+	}
+
+	// Extract content strings for writing chunk files.
+	chunks := make([]string, len(chunksWithMeta))
+	for i, c := range chunksWithMeta {
+		chunks[i] = c.Content
 	}
 
 	// Step 3: derive slug and metadata.
@@ -51,13 +58,19 @@ func (s *Store) UploadDocument(path string) (DocumentMeta, error) {
 		return DocumentMeta{}, fmt.Errorf("upload: write meta: %w", err)
 	}
 
-	// Step 5: optionally copy source file for traceability.
+	// Step 5: write CHUNKS.toml search index with position metadata.
+	if err := s.writeChunksIndexFromMeta(slug, chunksWithMeta); err != nil {
+		// Non-fatal: the index can be rebuilt from chunk files.
+		_ = err
+	}
+
+	// Step 6: optionally copy source file for traceability.
 	if err := s.copySource(path, slug); err != nil {
 		// Non-fatal: the document is already ingested.
 		_ = err
 	}
 
-	// Step 6: update INDEX.md.
+	// Step 7: update INDEX.md.
 	if err := s.updateIndex(slug, meta); err != nil {
 		// Non-fatal: re-index can be rebuilt.
 		_ = err

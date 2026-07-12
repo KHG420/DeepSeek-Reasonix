@@ -13,6 +13,7 @@
 //	├── INDEX.md                   ← document-level index (runtime, not prefix)
 //	└── <document-slug>/
 //	    ├── meta.json              ← {original_name, source_type, added_at, chunk_count, total_chars}
+//	    ├── CHUNKS.toml            ← pre-computed term frequencies per chunk (search index)
 //	    ├── source.<ext>           ← original file (preserved for audit)
 //	    └── chunks/
 //	        ├── 000.md
@@ -42,10 +43,37 @@ type Chunk struct {
 	Content string // raw Markdown content of the chunk file
 }
 
+// ChunkWithMeta is a chunk bundled with position metadata: which section of the
+// document it belongs to and its character offset in the original full text.
+type ChunkWithMeta struct {
+	Content string // chunk text
+	Section string // nearest markdown heading above this chunk, e.g. "## 安装"
+	Offset  int    // character offset in the original document text (0-based)
+}
+
 // SearchHit is one ranked result from a BM25 search over chunks.
 type SearchHit struct {
 	Score   float64
 	DocSlug string
 	ChunkID string
 	Snippet string // whitespace-compacted excerpt centered on the query
+}
+
+// ChunksIndex is the per-document search index persisted in CHUNKS.toml. It
+// stores pre-computed term frequencies for every chunk so Search can score
+// documents without re-reading and re-tokenising every chunk file.
+type ChunksIndex struct {
+	Slug       string            `toml:"slug"`
+	ChunkCount int               `toml:"chunk_count"`
+	Chunks     []ChunkIndexEntry `toml:"chunks"`
+}
+
+// ChunkIndexEntry holds the pre-computed term frequencies and position
+// metadata for one chunk.
+type ChunkIndexEntry struct {
+	ID        string         `toml:"id"`
+	TermCount int            `toml:"term_count"`
+	Terms     map[string]int `toml:"terms"`
+	Section   string         `toml:"section"`
+	Offset    int            `toml:"offset"`
 }

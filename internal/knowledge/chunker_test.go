@@ -17,7 +17,7 @@ func TestChunk_Empty(t *testing.T) {
 
 func TestChunk_SingleParagraph(t *testing.T) {
 	got := ChunkText("hello world")
-	if len(got) != 1 || got[0] != "hello world" {
+	if len(got) != 1 || got[0].Content != "hello world" {
 		t.Errorf("got %v, want [hello world]", got)
 	}
 }
@@ -40,8 +40,8 @@ func TestChunk_ShortParagraphMerged(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("expected 1 chunk after merge, got %d: %v", len(got), got)
 	}
-	if !strings.Contains(got[0], "OK") {
-		t.Errorf("short paragraph not merged: %q", got[0])
+	if !strings.Contains(got[0].Content, "OK") {
+		t.Errorf("short paragraph not merged: %q", got[0].Content)
 	}
 }
 
@@ -79,8 +79,8 @@ func TestChunk_LongParagraphSplit(t *testing.T) {
 		t.Fatalf("expected at least 2 chunks for long paragraph, got %d", len(got))
 	}
 	for i, c := range got {
-		if len(c) > 2200 {
-			t.Errorf("chunk %d is still too long: %d chars", i, len(c))
+		if len(c.Content) > 2200 {
+			t.Errorf("chunk %d is still too long: %d chars", i, len(c.Content))
 		}
 	}
 }
@@ -118,7 +118,75 @@ func TestChunk_SingleNewlinePreserved(t *testing.T) {
 	if len(got) != 2 {
 		t.Fatalf("expected 2 chunks, got %d: %v", len(got), got)
 	}
-	if !strings.Contains(got[0], "\n") {
+	if !strings.Contains(got[0].Content, "\n") {
 		t.Error("single newlines within paragraph should be preserved")
+	}
+}
+
+func TestChunk_SectionDetection(t *testing.T) {
+	// Chunks should carry the nearest preceding heading at their start offset.
+	// Short headings (like "## Installation" alone) merge into the previous
+	// paragraph, so the merged chunk's section reflects where the chunk starts.
+	text := "# Introduction\n\n" +
+		strings.Repeat("This is the intro paragraph with enough characters to avoid short-chunk merging. ", 6) +
+		"\n\n## Installation\n\n" +
+		strings.Repeat("Installation instructions with enough characters to avoid merging. ", 6)
+	got := ChunkText(text)
+	if len(got) < 2 {
+		t.Fatalf("expected at least 2 chunks, got %d", len(got))
+	}
+	// Chunk 0: "# Introduction" heading (short, stands alone as first para).
+	if got[0].Section != "# Introduction" {
+		t.Errorf("chunk 0 section: got %q, want '# Introduction'", got[0].Section)
+	}
+	// Chunk 1: the intro paragraph merged with the short "## Installation"
+	// heading that follows it. The section is where the chunk *starts*.
+	if got[1].Section != "# Introduction" {
+		t.Errorf("chunk 1 section: got %q, want '# Introduction'", got[1].Section)
+	}
+	// Subsequent chunks (after the heading boundary) get "## Installation".
+	foundInstall := false
+	for _, c := range got[2:] {
+		if c.Section == "## Installation" {
+			foundInstall = true
+			break
+		}
+	}
+	if !foundInstall {
+		t.Error("expected a later chunk with section '## Installation'")
+	}
+}
+
+func TestChunk_OffsetTracking(t *testing.T) {
+	// The first chunk should start near offset 0; subsequent chunks at higher offsets.
+	longPara := strings.Repeat("Long paragraph with enough characters to avoid short-chunk merging. ", 6)
+	text := "# Title\n\n" + longPara + "\n\n" + longPara
+	got := ChunkText(text)
+	if len(got) < 2 {
+		t.Fatalf("expected at least 2 chunks, got %d", len(got))
+	}
+	if got[0].Offset < 0 {
+		t.Errorf("chunk 0 offset should be >= 0, got %d", got[0].Offset)
+	}
+	if got[1].Offset <= got[0].Offset {
+		t.Errorf("chunk 1 offset (%d) should be > chunk 0 offset (%d)", got[1].Offset, got[0].Offset)
+	}
+}
+
+func TestChunkTextContent(t *testing.T) {
+	// ChunkTextContent should return just the content strings.
+	longPara := strings.Repeat("Long paragraph with enough characters to avoid short-chunk merging. ", 6)
+	// TrimSpace is applied per-paragraph, so trailing spaces are stripped.
+	trimmed := strings.TrimSpace(longPara)
+	text := longPara + "\n\n" + longPara
+	got := ChunkTextContent(text)
+	if len(got) != 2 {
+		t.Fatalf("expected 2 chunks, got %d", len(got))
+	}
+	if got[0] != trimmed {
+		t.Errorf("chunk 0: got %q, want %q", got[0], trimmed)
+	}
+	if got[1] != trimmed {
+		t.Errorf("chunk 1: got %q, want %q", got[1], trimmed)
 	}
 }

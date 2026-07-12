@@ -7,6 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/BurntSushi/toml"
+
+	"reasonix/internal/retrieval"
 )
 
 // Store manages the on-disk knowledge base under .reasonix/knowledge/.
@@ -218,4 +222,172 @@ func (s *Store) ListDocuments() ([]DocumentMeta, error) {
 func (s *Store) Exists(slug string) bool {
 	_, err := os.Stat(s.DocDir(slug))
 	return err == nil
+}
+
+// ChunksIndexPath returns the path to a document's CHUNKS.toml.
+func (s *Store) ChunksIndexPath(slug string) string {
+	return filepath.Join(s.DocDir(slug), "CHUNKS.toml")
+}
+
+// WriteChunksIndex persists a ChunksIndex as TOML. It ensures the document
+// directory exists before writing.
+func (s *Store) WriteChunksIndex(slug string, index *ChunksIndex) error {
+	if err := os.MkdirAll(s.DocDir(slug), 0o755); err != nil {
+		return fmt.Errorf("ensure doc dir: %w", err)
+	}
+	f, err := os.Create(s.ChunksIndexPath(slug))
+	if err != nil {
+		return fmt.Errorf("create CHUNKS.toml: %w", err)
+	}
+	defer f.Close()
+	if err := toml.NewEncoder(f).Encode(index); err != nil {
+		return fmt.Errorf("encode CHUNKS.toml: %w", err)
+	}
+	return nil
+}
+
+// ReadChunksIndex reads and decodes a document's CHUNKS.toml. It returns nil
+// and no error when the file does not exist, so callers can fall back to a
+// full scan of chunk files.
+func (s *Store) ReadChunksIndex(slug string) (*ChunksIndex, error) {
+	f, err := os.Open(s.ChunksIndexPath(slug))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("open CHUNKS.toml: %w", err)
+	}
+	defer f.Close()
+	var index ChunksIndex
+	if _, err := toml.NewDecoder(f).Decode(&index); err != nil {
+		return nil, fmt.Errorf("decode CHUNKS.toml: %w", err)
+	}
+	return &index, nil
+}
+
+// writeChunksIndexFromMeta builds and persists a ChunksIndex from chunk
+// metadata, including pre-computed term frequencies and position info.
+func (s *Store) writeChunksIndexFromMeta(slug string, chunks []ChunkWithMeta) error {
+	index := &ChunksIndex{
+		Slug:       slug,
+		ChunkCount: len(chunks),
+		Chunks:     make([]ChunkIndexEntry, len(chunks)),
+	}
+	for i, c := range chunks {
+		id := fmt.Sprintf("%03d", i)
+		tokens := retrieval.Tokens(c.Content)
+		tc := retrieval.Counts(tokens)
+		index.Chunks[i] = ChunkIndexEntry{
+			ID:        id,
+			TermCount: len(tokens),
+			Terms:     tc,
+			Section:   c.Section,
+			Offset:    c.Offset,
+		}
+	}
+	if err := s.WriteChunksIndex(slug, index); err != nil {
+		return fmt.Errorf("write CHUNKS.toml: %w", err)
+	}
+	return nil
+}
+
+// ReadChunkContext reads a chunk identified by docSlug and chunkID, optionally
+// including up to context adjacent chunks before and after. When context is 0
+// it behaves like ReadChunk.
+//
+// If the document has a CHUNKS.toml with section metadata, adjacent chunks
+// under the same section are merged into continuous text with section headers
+// (## Section). Otherwise the result is formatted with chunk ID markers as a
+// fallback.
+func (s *Store) ReadChunkContext(slug, chunkID string, context int) (string, error) {
+	if context <= 0 {
+		return s.ReadChunk(slug, chunkID)
+	}
+
+	// Parse chunk ID to integer.
+	id := chunkIDToInt(chunkID)
+
+	// Collect all chunk IDs.
+	allIDs, err := s.ListChunks(slug)
+	if err != nil {
+		return "", err
+	}
+
+	// Determine the window.
+	start := id - context
+	if start < 0 {
+		start = 0
+	}
+	end := id + context + 1 // +1 to include the target
+	maxID := len(allIDs)
+	if end > maxID {
+		end = maxID
+	}
+
+	// Try to load section metadata from CHUNKS.toml for richer output.
+	sectionByID := map[string]string{}
+	hasSections := false
+	if index, err := s.ReadChunksIndex(slug); err == nil && index != nil {
+		for _, entry := range index.Chunks {
+			sectionByID[entry.ID] = entry.Section
+			if entry.Section != "" {
+				hasSections = true
+			}
+		}
+	}
+
+	var b strings.Builder
+	if hasSections {
+		// Rich output: merge adjacent chunks under the same section header.
+		var lastSection string
+		for i := start; i < end; i++ {
+			cid := fmt.Sprintf("%03d", i)
+			text, err := s.ReadChunk(slug, cid)
+			if err != nil {
+				continue
+			}
+			section := sectionByID[cid]
+			if section != lastSection {
+				if b.Len() > 0 {
+					b.WriteString("\n\n")
+				}
+				if section != "" {
+					b.WriteString("## " + section + "\n")
+				}
+				lastSection = section
+			} else if b.Len() > 0 {
+				b.WriteString("\n\n")
+			}
+			b.WriteString(text)
+		}
+	} else {
+		// Fallback: chunk ID markers for documents without section metadata.
+		for i := start; i < end; i++ {
+			cid := fmt.Sprintf("%03d", i)
+			text, err := s.ReadChunk(slug, cid)
+			if err != nil {
+				continue
+			}
+			if b.Len() > 0 {
+				b.WriteString("\n\n---\n\n")
+			}
+			b.WriteString(fmt.Sprintf("[%s]\n%s", cid, text))
+		}
+	}
+
+	if b.Len() == 0 {
+		return "", fmt.Errorf("chunk %q not found in document %q", chunkID, slug)
+	}
+	return b.String(), nil
+}
+
+// chunkIDToInt parses a zero-padded chunk ID like "005" to its integer value.
+func chunkIDToInt(chunkID string) int {
+	id := 0
+	for _, r := range chunkID {
+		if r >= '0' && r <= '9' {
+			id = id*10 + int(r-'0')
+		}
+	}
+	return id
 }

@@ -45,6 +45,7 @@ import (
 	"reasonix/internal/planmode"
 	"reasonix/internal/plugin"
 	"reasonix/internal/provider"
+	"reasonix/internal/recall"
 	"reasonix/internal/sandbox"
 	"reasonix/internal/secrets"
 	"reasonix/internal/skill"
@@ -707,6 +708,10 @@ func Build(ctx context.Context, opts Options) (*control.Controller, error) {
 	reg.Add(memory.NewRememberTool(mem.Store))
 	reg.Add(memory.NewForgetTool(mem.Store))
 	reg.Add(knowledge.NewTool(knowledgeStore))
+	// The `recall` tool combines memory and knowledge search into one call,
+	// returning source-annotated results so the model can decide which to
+	// follow up on without making two separate tool calls.
+	reg.Add(recall.NewTool(mem.Store, knowledgeStore))
 
 	// The `ask` tool puts structured multiple-choice questions to the user. It
 	// reaches them through the Asker on the call context, which interactive
