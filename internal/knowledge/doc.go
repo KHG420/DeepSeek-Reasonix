@@ -35,6 +35,9 @@ type DocumentMeta struct {
 	AddedAt      time.Time `json:"added_at"`
 	ChunkCount   int       `json:"chunk_count"`
 	TotalChars   int       `json:"total_chars"`
+	Title        string    `json:"title,omitempty"`    // extracted paper title (C1)
+	Authors      []string  `json:"authors,omitempty"`  // extracted paper authors (C1)
+	Abstract     string    `json:"abstract,omitempty"` // extracted abstract text (C1)
 }
 
 // Chunk is a single paragraph-level slice of a document, stored as 000.md etc.
@@ -44,38 +47,58 @@ type Chunk struct {
 }
 
 // ChunkWithMeta is a chunk bundled with position metadata: which section of the
-// document it belongs to and its character offset in the original full text.
+// document it belongs to, its character offset in the original full text, and
+// an optional section role (e.g. "abstract", "introduction") for search weighting.
 type ChunkWithMeta struct {
-	Content string // chunk text
-	Section string // nearest markdown heading above this chunk, e.g. "## 安装"
-	Offset  int    // character offset in the original document text (0-based)
+	Content     string // chunk text
+	Section     string // nearest markdown heading above this chunk, e.g. "## 安装"
+	Offset      int    // character offset in the original document text (0-based)
+	SectionID   string // section identifier for grouping coarse-level chunks (e.g. "# Introduction")
+	SectionRole string // classified role: "abstract", "introduction", etc. (C2)
 }
 
 // SearchHit is one ranked result from a BM25 search over chunks.
 type SearchHit struct {
-	Score   float64
-	DocSlug string
-	ChunkID string
-	Snippet string // whitespace-compacted excerpt centered on the query
-	Section string // nearest markdown heading above this chunk (from CHUNKS.toml)
-	Offset  int    // character offset in the original document text (0-based)
+	Score       float64
+	DocSlug     string
+	ChunkID     string
+	Snippet     string // whitespace-compacted excerpt centered on the query
+	Section     string // nearest markdown heading above this chunk (from CHUNKS.toml)
+	Offset      int    // character offset in the original document text (0-based)
+	SectionRole string // classified section role, e.g. "abstract", "introduction" (C2)
+}
+
+// SearchFilter holds optional filters for narrowing a knowledge base search.
+// When a field is the zero value (empty string / 0), the filter is not applied.
+// Multiple filters are AND-ed together.
+type SearchFilter struct {
+	DocSlug    string // if non-empty, only search documents with this exact slug
+	SourceType string // if non-empty, only search documents with this source type
+	Section    string // if non-empty, only include chunks whose section contains this string (substring match)
 }
 
 // ChunksIndex is the per-document search index persisted in CHUNKS.toml. It
 // stores pre-computed term frequencies for every chunk so Search can score
 // documents without re-reading and re-tokenising every chunk file.
+// When an embedder is configured, it also stores dense vector representations
+// for hybrid BM25 + embedding search.
 type ChunksIndex struct {
 	Slug       string            `toml:"slug"`
 	ChunkCount int               `toml:"chunk_count"`
+	VectorDim  int               `toml:"vector_dim,omitempty"`
+	HasVectors bool              `toml:"has_vectors,omitempty"`
 	Chunks     []ChunkIndexEntry `toml:"chunks"`
 }
 
-// ChunkIndexEntry holds the pre-computed term frequencies and position
-// metadata for one chunk.
+// ChunkIndexEntry holds the pre-computed term frequencies, position
+// metadata, and optional dense vector for one chunk.
 type ChunkIndexEntry struct {
-	ID        string         `toml:"id"`
-	TermCount int            `toml:"term_count"`
-	Terms     map[string]int `toml:"terms"`
-	Section   string         `toml:"section"`
-	Offset    int            `toml:"offset"`
+	ID             string         `toml:"id"`
+	TermCount      int            `toml:"term_count"`
+	Terms          map[string]int `toml:"terms"`
+	Section        string         `toml:"section"`
+	Offset         int            `toml:"offset"`
+	Vector         []float64      `toml:"vector,omitempty"`
+	SectionChunkID string         `toml:"section_chunk_id,omitempty"` // points to the parent section-level chunk (e.g. "S00")
+	SectionRole    string         `toml:"section_role,omitempty"`     // classified role: "abstract", "introduction", etc. (C2)
 }

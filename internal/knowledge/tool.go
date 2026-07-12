@@ -59,11 +59,37 @@ func (t *Tool) Schema() json.RawMessage {
     },
     "filePath": {
       "type": "string",
-      "description": "Absolute or workspace-relative path to the document file for operation='upload'."
+      "description": "Absolute or workspace-relative path to the document file for operation='upload'. Mutually exclusive with 'directory'."
+    },
+    "directory": {
+      "type": "string",
+      "description": "Directory path for batch upload (operation='upload'). Files with supported extensions (.md, .txt, .pdf, .docx, .odt, .epub, .html, .xlsx, .pptx) are ingested. Mutually exclusive with 'filePath'."
+    },
+    "recursive": {
+      "type": "boolean",
+      "description": "When true with operation='upload' and 'directory', recursively walk subdirectories."
     },
     "limit": {
       "type": "integer",
       "description": "Maximum search results to return. Default 8, max 20."
+    },
+    "sourceType": {
+      "type": "string",
+      "description": "Optional source type filter for operation='search', e.g. 'pdf', 'md', 'txt'. Only chunks from documents with this source type are returned."
+    },
+    "section": {
+      "type": "string",
+      "description": "Optional section filter for operation='search'. Only chunks whose section heading contains this substring are returned."
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["bm25", "hybrid"],
+      "description": "Search mode for operation='search'. 'bm25' (default) uses pure BM25 keyword matching. 'hybrid' combines BM25 with dense embedding similarity for better recall. Requires documents to have been uploaded with an embedder configured."
+    },
+    "level": {
+      "type": "string",
+      "enum": ["chunk", "section"],
+      "description": "Read granularity for operation='read'. 'chunk' (default) reads the individual chunk. 'section' reads the entire section containing the chunk."
     }
   },
   "required": ["operation"]
@@ -97,13 +123,19 @@ func (t *Tool) Execute(ctx context.Context, args json.RawMessage) (string, error
 // --- arg struct ---
 
 type knowledgeArgs struct {
-	Operation string `json:"operation"`
-	Query     string `json:"query"`
-	DocSlug   string `json:"docSlug"`
-	ChunkID   string `json:"chunkID"`
-	Context   int    `json:"context"`
-	FilePath  string `json:"filePath"`
-	Limit     int    `json:"limit"`
+	Operation  string `json:"operation"`
+	Query      string `json:"query"`
+	DocSlug    string `json:"docSlug"`
+	ChunkID    string `json:"chunkID"`
+	Context    int    `json:"context"`
+	FilePath   string `json:"filePath"`
+	Directory  string `json:"directory"`
+	Recursive  bool   `json:"recursive"`
+	Limit      int    `json:"limit"`
+	SourceType string `json:"sourceType"`
+	Section    string `json:"section"`
+	Mode       string `json:"mode"`
+	Level      string `json:"level"`
 }
 
 // --- operation handlers ---
@@ -116,7 +148,21 @@ func (t *Tool) search(p knowledgeArgs) (string, error) {
 	if limit > 20 {
 		limit = 20
 	}
-	hits, err := t.store.Search(p.Query, limit)
+
+	filter := SearchFilter{
+		DocSlug:    p.DocSlug,
+		SourceType: p.SourceType,
+		Section:    p.Section,
+	}
+
+	var hits []SearchHit
+	var err error
+	switch strings.ToLower(p.Mode) {
+	case "hybrid":
+		hits, err = t.store.HybridSearch(p.Query, limit, filter)
+	default:
+		hits, err = t.store.Search(p.Query, limit, filter)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -137,6 +183,12 @@ func (t *Tool) read(p knowledgeArgs) (string, error) {
 	if p.ChunkID == "" {
 		return "", fmt.Errorf("chunkID is required for read")
 	}
+
+	// When level is "section", resolve the chunk's section chunk and read it.
+	if strings.ToLower(p.Level) == "section" {
+		return t.readSection(p)
+	}
+
 	ctx := p.Context
 	if ctx < 0 {
 		ctx = 0
@@ -145,6 +197,29 @@ func (t *Tool) read(p knowledgeArgs) (string, error) {
 		ctx = 5
 	}
 	text, err := t.store.ReadChunkContext(p.DocSlug, p.ChunkID, ctx)
+	if err != nil {
+		return "", err
+	}
+	return text, nil
+}
+
+// readSection resolves the section chunk for a given chunk and returns its full content.
+func (t *Tool) readSection(p knowledgeArgs) (string, error) {
+	index, err := t.store.ReadChunksIndex(p.DocSlug)
+	if err != nil || index == nil {
+		return "", fmt.Errorf("no index found for document %q", p.DocSlug)
+	}
+	for _, entry := range index.Chunks {
+		if entry.ID == p.ChunkID && entry.SectionChunkID != "" {
+			text, err := t.store.ReadSectionChunk(p.DocSlug, entry.SectionChunkID)
+			if err != nil {
+				return "", err
+			}
+			return text, nil
+		}
+	}
+	// Fallback: no section chunk found, return the chunk itself.
+	text, err := t.store.ReadChunk(p.DocSlug, p.ChunkID)
 	if err != nil {
 		return "", err
 	}
@@ -167,8 +242,20 @@ func (t *Tool) list() (string, error) {
 }
 
 func (t *Tool) upload(p knowledgeArgs) (string, error) {
+	// Directory batch upload.
+	if p.Directory != "" {
+		if p.FilePath != "" {
+			return "", fmt.Errorf("filePath and directory are mutually exclusive")
+		}
+		summary, err := t.store.UploadDirectory(p.Directory, p.Recursive)
+		if err != nil {
+			return "", fmt.Errorf("batch upload failed: %w", err)
+		}
+		return summary, nil
+	}
+	// Single file upload.
 	if p.FilePath == "" {
-		return "", fmt.Errorf("filePath is required for upload")
+		return "", fmt.Errorf("filePath or directory is required for upload")
 	}
 	meta, err := t.store.UploadDocument(p.FilePath)
 	if err != nil {

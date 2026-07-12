@@ -181,6 +181,122 @@ func TestSearch_IndexPathFallback(t *testing.T) {
 	}
 }
 
+func TestSearch_FilterByDocSlug(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "doc-alpha", []string{"alpha content about machine learning"})
+	populateDoc(t, s, "doc-beta", []string{"beta content about deep learning"})
+
+	// Search all docs — both should match.
+	all, err := s.Search("learning", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 2 {
+		t.Fatalf("expected 2 hits without filter, got %d", len(all))
+	}
+
+	// Filter by doc slug — only beta.
+	hits, err := s.Search("learning", 10, SearchFilter{DocSlug: "doc-beta"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("expected 1 hit for doc-beta, got %d", len(hits))
+	}
+	if hits[0].DocSlug != "doc-beta" {
+		t.Errorf("expected doc-beta, got %q", hits[0].DocSlug)
+	}
+}
+
+func TestSearch_FilterBySourceType(t *testing.T) {
+	s := tempStore(t)
+	populateDocWithSourceType(t, s, "doc-pdf", "pdf", []string{"machine learning in pdf"})
+	populateDocWithSourceType(t, s, "doc-txt", "txt", []string{"machine learning in txt"})
+
+	// Filter by source type.
+	hits, err := s.Search("machine", 10, SearchFilter{SourceType: "pdf"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("expected 1 hit for pdf, got %d", len(hits))
+	}
+	if hits[0].DocSlug != "doc-pdf" {
+		t.Errorf("expected doc-pdf, got %q", hits[0].DocSlug)
+	}
+}
+
+func TestSearch_FilterBySection(t *testing.T) {
+	s := tempStore(t)
+	// Use populateDocWithIndex to set sections.
+	populateDocWithIndex(t, s, "sec-doc", []string{
+		"Introduction text about neural networks.",
+		"Methods section describing optimization techniques.",
+		"Results of the experiment on neural network training.",
+	}, []string{
+		"## Introduction",
+		"## Methods",
+		"## Results",
+	}, []int{0, 100, 250})
+
+	// Filter by section substring.
+	hits, err := s.Search("neural", 10, SearchFilter{Section: "Results"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("expected 1 hit for section Results, got %d", len(hits))
+	}
+	if hits[0].ChunkID != "002" {
+		t.Errorf("expected chunk 002 (Results), got %s", hits[0].ChunkID)
+	}
+}
+
+func TestSearch_FilterCombined(t *testing.T) {
+	s := tempStore(t)
+	populateDocWithIndex(t, s, "doc-a", []string{
+		"Alpha intro about machine learning.",
+		"Alpha methods for deep learning.",
+	}, []string{"## Introduction", "## Methods"}, []int{0, 100})
+	populateDocWithIndex(t, s, "doc-b", []string{
+		"Beta intro about machine learning.",
+		"Beta methods for reinforcement learning.",
+	}, []string{"## Introduction", "## Methods"}, []int{0, 100})
+
+	// Combined filter: doc slug + section.
+	hits, err := s.Search("learning", 10, SearchFilter{DocSlug: "doc-b", Section: "Methods"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 {
+		t.Fatalf("expected 1 hit, got %d", len(hits))
+	}
+	if hits[0].DocSlug != "doc-b" || hits[0].ChunkID != "001" {
+		t.Errorf("expected doc-b chunk 001, got %s/%s", hits[0].DocSlug, hits[0].ChunkID)
+	}
+}
+
+func TestSearch_EmptyFilterEquivalent(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "filter-equiv", []string{"content about topic"})
+
+	// Search with empty filter should equal search without filter.
+	hitsNoFilter, err := s.Search("topic", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hitsWithFilter, err := s.Search("topic", 10, SearchFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hitsNoFilter) != len(hitsWithFilter) {
+		t.Fatalf("mismatch: no filter=%d, empty filter=%d", len(hitsNoFilter), len(hitsWithFilter))
+	}
+	if len(hitsNoFilter) > 0 && hitsNoFilter[0].Score != hitsWithFilter[0].Score {
+		t.Errorf("score mismatch: %.4f vs %.4f", hitsNoFilter[0].Score, hitsWithFilter[0].Score)
+	}
+}
+
 func TestSearch_EmptyQuery(t *testing.T) {
 	s := tempStore(t)
 	populateDoc(t, s, "empty-query", []string{"some content here"})
@@ -230,6 +346,179 @@ func populateDocWithIndex(t *testing.T, s *Store, slug string, chunks []string, 
 	}
 	if err := s.writeChunksIndexFromMeta(slug, chunkMetas); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// populateDocWithSourceType is like populateDoc but sets a specific source
+// type in the metadata so source-type filtering tests can rely on it.
+func populateDocWithSourceType(t *testing.T, s *Store, slug string, sourceType string, chunks []string) {
+	t.Helper()
+	if err := s.WriteChunks(slug, chunks); err != nil {
+		t.Fatal(err)
+	}
+	meta := DocumentMeta{
+		OriginalName: slug + "." + sourceType,
+		SourceType:   sourceType,
+		ChunkCount:   len(chunks),
+		TotalChars:   totalLen(chunks),
+	}
+	if err := s.WriteMeta(slug, meta); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestHybridSearch_NoEmbedder(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "hybrid-test", []string{
+		"alpha beta gamma delta",
+		"epsilon zeta eta theta",
+	})
+
+	// Without an embedder, HybridSearch falls back to BM25 and should still work.
+	hits, err := s.HybridSearch("alpha beta", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit from hybrid fallback")
+	}
+}
+
+func TestHybridSearch_WithVectors(t *testing.T) {
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+
+	populateDocWithIndex(t, s, "hybrid-vec", []string{
+		"The quick brown fox jumps over the lazy dog.",
+		"Machine learning and artificial intelligence topics.",
+	}, []string{"## Animals", "## AI"}, []int{0, 100})
+
+	// Both Search (BM25) and HybridSearch should return results.
+	bm25Hits, err := s.Search("fox dog", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hybridHits, err := s.HybridSearch("fox dog", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(bm25Hits) == 0 {
+		t.Fatal("BM25 search should find hits")
+	}
+	if len(hybridHits) == 0 {
+		t.Fatal("Hybrid search should find hits")
+	}
+	// The top result should be the same chunk (fox content).
+	if hybridHits[0].ChunkID != "000" {
+		t.Errorf("expected chunk 000 to rank first, got %s", hybridHits[0].ChunkID)
+	}
+}
+
+func TestHybridSearch_WithFilter(t *testing.T) {
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+
+	populateDocWithIndex(t, s, "doc-x", []string{
+		"Alpha content about machine learning.",
+		"Alpha content about deep learning.",
+	}, []string{"## Intro", "## Methods"}, []int{0, 100})
+	populateDocWithIndex(t, s, "doc-y", []string{
+		"Beta content about reinforcement learning.",
+	}, []string{"## Intro"}, []int{0})
+
+	// Filter by doc slug.
+	hits, err := s.HybridSearch("learning", 10, SearchFilter{DocSlug: "doc-x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 2 {
+		t.Fatalf("expected 2 hits from doc-x, got %d", len(hits))
+	}
+	for _, h := range hits {
+		if h.DocSlug != "doc-x" {
+			t.Errorf("expected only doc-x hits, got %s", h.DocSlug)
+		}
+	}
+}
+
+func TestHybridSearch_NoResults(t *testing.T) {
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+
+	populateDoc(t, s, "empty-hybrid", []string{"irrelevant content here"})
+
+	hits, err := s.HybridSearch("quantum physics", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 0 {
+		t.Errorf("expected 0 hits for unrelated query, got %d", len(hits))
+	}
+}
+
+func TestHybridSearch_EmptyQuery(t *testing.T) {
+	s := tempStore(t)
+	populateDoc(t, s, "empty-hybrid", []string{"content"})
+
+	_, err := s.HybridSearch("   ", 10)
+	if err == nil {
+		t.Error("expected error for empty query")
+	}
+}
+
+func TestHybridSearch_WithReranker(t *testing.T) {
+	s := tempStore(t)
+	s.SetEmbedder(NewMockEmbedder(4))
+	s.SetReranker(MockReranker{})
+
+	populateDocWithIndex(t, s, "rerank-doc", []string{
+		"The quick brown fox jumps over the lazy dog near the river bank.",
+		"Machine learning and neural networks for artificial intelligence.",
+	}, []string{"## Animals", "## AI"}, []int{0, 100})
+
+	// Hybrid search with reranker should still return results.
+	hits, err := s.HybridSearch("machine learning neural networks", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit with reranker")
+	}
+	// The ML chunk should rank higher than the animal chunk.
+	if hits[0].ChunkID != "001" {
+		t.Errorf("expected chunk 001 (ML) to rank first with reranker, got %s", hits[0].ChunkID)
+	}
+}
+
+func TestHybridSearch_WithReranker_NoVectors(t *testing.T) {
+	s := tempStore(t)
+	// Set reranker but no embedder (no vectors).
+	s.SetReranker(MockReranker{})
+
+	populateDoc(t, s, "rerank-novec", []string{
+		"alpha beta gamma delta epsilon",
+		"zeta eta theta iota kappa",
+	})
+
+	// Should work as BM25-only + reranker.
+	hits, err := s.HybridSearch("alpha beta gamma", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) == 0 {
+		t.Fatal("expected at least one hit with reranker and no vectors")
+	}
+}
+
+func TestSetReranker(t *testing.T) {
+	s := tempStore(t)
+	if s.reranker != nil {
+		t.Error("expected nil reranker by default")
+	}
+	s.SetReranker(MockReranker{})
+	if s.reranker == nil {
+		t.Error("expected non-nil reranker after SetReranker")
 	}
 }
 

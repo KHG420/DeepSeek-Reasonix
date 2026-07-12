@@ -111,6 +111,101 @@ func TestUploadDocument_NotFound(t *testing.T) {
 	}
 }
 
+func TestUploadDirectory_Basic(t *testing.T) {
+	s := tempStore(t)
+	dir := t.TempDir()
+
+	// Create a few document files.
+	longPara := strings.Repeat("This is a long paragraph with enough characters to stay independent. ", 6)
+	os.WriteFile(filepath.Join(dir, "a.md"), []byte("# A\n\n"+longPara), 0o644)
+	os.WriteFile(filepath.Join(dir, "b.md"), []byte("# B\n\n"+longPara), 0o644)
+	os.WriteFile(filepath.Join(dir, "notes.txt"), []byte(longPara+"\n\n"+longPara), 0o644)
+
+	// Create an unsupported file that should be skipped.
+	os.WriteFile(filepath.Join(dir, "skip.bin"), []byte("binary data"), 0o644)
+
+	summary, err := s.UploadDirectory(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(summary, "Uploaded 3 documents") {
+		t.Errorf("unexpected summary: %q", summary)
+	}
+	if !strings.Contains(summary, "2 md") || !strings.Contains(summary, "1 txt") {
+		t.Errorf("summary should mention file types: %q", summary)
+	}
+	if strings.Contains(summary, "Failures:") {
+		t.Errorf("unexpected failures: %q", summary)
+	}
+}
+
+func TestUploadDirectory_Recursive(t *testing.T) {
+	s := tempStore(t)
+	root := t.TempDir()
+
+	longPara := strings.Repeat("This is a long paragraph with enough characters to stay independent. ", 6)
+	os.WriteFile(filepath.Join(root, "top.md"), []byte("# Top\n\n"+longPara), 0o644)
+
+	subdir := filepath.Join(root, "sub")
+	os.Mkdir(subdir, 0o755)
+	os.WriteFile(filepath.Join(subdir, "nested.md"), []byte("# Nested\n\n"+longPara), 0o644)
+
+	// Non-recursive: should only find top.md.
+	summary, err := s.UploadDirectory(root, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(summary, "Uploaded 1 documents") {
+		t.Errorf("non-recursive should find only top-level files: %q", summary)
+	}
+	_ = summary
+
+	// Create a fresh store for recursive test.
+	s2 := tempStore(t)
+
+	summary2, err := s2.UploadDirectory(root, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(summary2, "Uploaded 2 documents") {
+		t.Errorf("recursive should find both files: %q", summary2)
+	}
+}
+
+func TestUploadDirectory_NoSupportedFiles(t *testing.T) {
+	s := tempStore(t)
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "data.bin"), []byte("binary"), 0o644)
+
+	summary, err := s.UploadDirectory(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(summary, "No supported documents found") {
+		t.Errorf("unexpected summary: %q", summary)
+	}
+}
+
+func TestUploadDirectory_NotADirectory(t *testing.T) {
+	s := tempStore(t)
+	dir := t.TempDir()
+	f := filepath.Join(dir, "file.md")
+	os.WriteFile(f, []byte("content"), 0o644)
+
+	_, err := s.UploadDirectory(f, false)
+	if err == nil {
+		t.Error("expected error when path is not a directory")
+	}
+}
+
+func TestUploadDirectory_NonExistent(t *testing.T) {
+	s := tempStore(t)
+	_, err := s.UploadDirectory("/nonexistent/dir", false)
+	if err == nil {
+		t.Error("expected error for nonexistent directory")
+	}
+}
+
 // Slug returns the document slug derived from the metadata's original name and
 // added-at timestamp. This mirrors SlugFromPath but works from a meta struct.
 func (m DocumentMeta) Slug() string {

@@ -58,6 +58,49 @@ func TestMakeSnippetHandlesMultibyteBoundary(t *testing.T) {
 	}
 }
 
+func TestMakeSnippetSentenceBoundaryChinese(t *testing.T) {
+	// Chinese text with sentence punctuation. "新模型" appears as a contiguous
+	// substring in the second sentence.
+	text := "本文介绍了深度学习在自然语言处理中的应用。我们提出了新模型架构。实验结果表明该方法效果显著。"
+	out := MakeSnippet(text, "新模型", QueryTermsForTest(t, "新模型"), 30)
+	if !strings.Contains(out, "新模型") {
+		t.Fatalf("snippet missing query: %q", out)
+	}
+	// Should start at a sentence boundary, not in the middle.
+	if strings.HasPrefix(out, "们提出了") {
+		t.Fatalf("snippet should not start mid-sentence: %q", out)
+	}
+}
+
+func TestMakeSnippetSentenceBoundaryEnglish(t *testing.T) {
+	text := "This is the first sentence. The model architecture is described here. Experimental results show great performance."
+	out := MakeSnippet(text, "model architecture", QueryTermsForTest(t, "model architecture"), 40)
+	if !strings.Contains(out, "model architecture") {
+		t.Fatalf("snippet missing query: %q", out)
+	}
+}
+
+func TestMakeSnippetFallbackNoPunctuation(t *testing.T) {
+	// Text with no sentence punctuation should fall back to centered window.
+	text := strings.Repeat("word ", 200)
+	out := MakeSnippet(text, "word", QueryTermsForTest(t, "word"), 100)
+	// Content window is ≤ maxRunes; "..." suffix may add 3 extra runes.
+	if utf8.RuneCountInString(out) > 106 {
+		t.Fatalf("snippet too long without punctuation fallback: %d runes", utf8.RuneCountInString(out))
+	}
+	if !strings.Contains(out, "word") {
+		t.Fatalf("snippet missing query term: %q", out)
+	}
+}
+
+func TestMakeSnippetShortTextNoTruncation(t *testing.T) {
+	text := "Short text with no need to truncate."
+	out := MakeSnippet(text, "text", QueryTermsForTest(t, "text"), 200)
+	if out != text {
+		t.Fatalf("short text should not be truncated: %q, want %q", out, text)
+	}
+}
+
 func QueryTermsForTest(t *testing.T, query string) []string {
 	t.Helper()
 	terms, err := QueryTerms(query)
