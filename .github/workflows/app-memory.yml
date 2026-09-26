@@ -158,6 +158,9 @@ jobs:
           overwrite: true
           if-no-files-found: error
           retention-days: 7
+      - name: Inject one failed shard for rerun acceptance
+        if: ${{ matrix.shard == 1 && github.run_attempt == 1 }}
+        run: exit 1
 
   app-memory:
     if: always()
