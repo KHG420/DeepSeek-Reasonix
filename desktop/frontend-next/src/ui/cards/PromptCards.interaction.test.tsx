@@ -8,7 +8,7 @@ import { AskCard } from "./AskCard";
 
 afterEach(cleanup);
 
-const pending = () => new Promise<void>((resolve) => setTimeout(resolve, 20));
+const resolved = async () => {};
 
 describe("decision cards", () => {
   it("keeps every approval action locked while the decision is in flight", async () => {
@@ -17,7 +17,7 @@ describe("decision cards", () => {
     } as Extract<Item, { t: "approval" }>;
     let release = () => {};
     const approve = vi.fn(() => new Promise<void>((resolve) => { release = resolve; }));
-    render(<ApprovalCard item={item} onApprove={approve} onFullAccess={vi.fn(pending)} onPlan={vi.fn(pending)} />);
+    render(<ApprovalCard item={item} onApprove={approve} onFullAccess={vi.fn(resolved)} onPlan={vi.fn(resolved)} />);
 
     await userEvent.click(screen.getByRole("button", { name: "允许这一次" }));
     expect(screen.getByText("正在提交…")).toBeTruthy();
@@ -32,11 +32,11 @@ describe("decision cards", () => {
   // that actually writes a rule was not reachable from this window at all.
   it("offers the answers this call's host says it will honour, and no others", async () => {
     const card = (allows: { allowsSession?: boolean; allowsPersist?: boolean }) => {
-      const approve = vi.fn(pending);
+      const approve = vi.fn(resolved);
       const item = {
         t: "approval", id: "row", a: { id: "gate", tool: "computer_act", subject: "com.apple.Notes", ...allows },
       } as Extract<Item, { t: "approval" }>;
-      const r = render(<ApprovalCard item={item} onApprove={approve} onFullAccess={vi.fn(pending)} onPlan={vi.fn(pending)} />);
+      const r = render(<ApprovalCard item={item} onApprove={approve} onFullAccess={vi.fn(resolved)} onPlan={vi.fn(resolved)} />);
       return { approve, ...r };
     };
     const names = () => screen.getAllByRole("button").map((b) => b.textContent);
@@ -59,13 +59,13 @@ describe("decision cards", () => {
   });
 
   it("puts full access behind an explicit second confirmation", async () => {
-    const fullAccess = vi.fn(pending);
+    const fullAccess = vi.fn(resolved);
     const item = {
       t: "approval", id: "row", a: {
         id: "gate", tool: "bash", subject: "python - <<'PY'", reasonCode: "dynamic_bash", allowsSession: true,
       },
     } as Extract<Item, { t: "approval" }>;
-    render(<ApprovalCard item={item} onApprove={vi.fn(pending)} onFullAccess={fullAccess} onPlan={vi.fn(pending)} />);
+    render(<ApprovalCard item={item} onApprove={vi.fn(resolved)} onFullAccess={fullAccess} onPlan={vi.fn(resolved)} />);
 
     expect(screen.getByRole("button", { name: "本会话不再询问" })).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "切换全部放行…" }));
@@ -81,14 +81,14 @@ describe("decision cards", () => {
         { id: "q", header: "方向", prompt: "选哪个？", multi: false, options: [{ label: "A" }, { label: "B" }] },
       ] },
     } as Extract<Item, { t: "ask" }>;
-    const { container } = render(<AskCard item={item} onAnswer={vi.fn(pending)} />);
+    const { container } = render(<AskCard item={item} onAnswer={vi.fn(resolved)} />);
     expect(screen.queryByText("推荐")).toBeNull();
     expect(screen.getByRole("button", { name: "B" }).getAttribute("aria-pressed")).toBe("true");
     expect(within(container).getByText(/方向：/).parentElement?.textContent).toContain("B");
   });
 
   it("turns a supplied Other option into the single free-text choice", async () => {
-    const answer = vi.fn(pending);
+    const answer = vi.fn(resolved);
     const item = {
       t: "ask", id: "row", ask: { id: "ask", questions: [
         {
@@ -110,7 +110,7 @@ describe("decision cards", () => {
   // Choosing Other puts the caret in its box and Enter answers, so a typed
   // answer never needs the mouse; Enter that confirms an IME candidate does not.
   it("answers a typed Other from the keyboard, and leaves an IME confirm alone", async () => {
-    const answer = vi.fn(pending);
+    const answer = vi.fn(resolved);
     const item = {
       t: "ask", id: "row", ask: { id: "ask", questions: [
         { id: "city", header: "城市", prompt: "选择城市", multi: false, options: [{ label: "北京" }] },
@@ -144,7 +144,7 @@ describe("decision cards", () => {
         { id: "city", header: "城市", prompt: "选择城市", multi: false, options: [{ label: "北京" }] },
       ] },
     } as Extract<Item, { t: "ask" }>;
-    render(<AskCard item={item} onAnswer={vi.fn(pending)} />);
+    render(<AskCard item={item} onAnswer={vi.fn(resolved)} />);
     const other = screen.getByRole("button", { name: /其他 —— 自行填写/ });
     const box = screen.getByRole("textbox", { name: "其他 —— 自行填写" });
 
@@ -164,7 +164,7 @@ describe("decision cards", () => {
         { id: "size", header: "规模", prompt: "选择规模", multi: false, options: [{ label: "小" }, { label: "大" }] },
       ] },
     } as Extract<Item, { t: "ask" }>;
-    render(<AskCard item={item} onAnswer={vi.fn(pending)} />);
+    render(<AskCard item={item} onAnswer={vi.fn(resolved)} />);
 
     await userEvent.click(screen.getAllByRole("button", { name: /其他 —— 自行填写/ })[0]);
     await userEvent.keyboard("shenzhen{Enter}");
@@ -176,7 +176,7 @@ describe("decision cards", () => {
   // pick keeps a note box open and the note rides with the pick; choosing Other
   // still makes the typed text the whole answer.
   it("sends a note typed under a single-choice pick alongside it", async () => {
-    const answer = vi.fn(pending);
+    const answer = vi.fn(resolved);
     const item = {
       t: "ask", id: "row", ask: { id: "ask", questions: [
         { id: "next", header: "下一步", prompt: "怎么继续", multi: false, options: [{ label: "回传命令输出" }, { label: "跳过" }] },
@@ -196,7 +196,7 @@ describe("decision cards", () => {
   // Leaving Other for an option takes its answer back rather than sending it as
   // a note, and returning to Other finds it still typed.
   it("does not turn an abandoned Other answer into a pick's note", async () => {
-    const answer = vi.fn(pending);
+    const answer = vi.fn(resolved);
     const item = {
       t: "ask", id: "row", ask: { id: "ask", questions: [
         { id: "lang", header: "语言", prompt: "用什么写", multi: false, options: [{ label: "A" }, { label: "B" }] },
@@ -217,7 +217,7 @@ describe("decision cards", () => {
 
   // Enter in a pick's note answers the way Enter in the Other box does.
   it("answers a pick's note from the keyboard", async () => {
-    const answer = vi.fn(pending);
+    const answer = vi.fn(resolved);
     const item = {
       t: "ask", id: "row", ask: { id: "ask", questions: [
         { id: "next", header: "下一步", prompt: "怎么继续", multi: false, options: [{ label: "回传命令输出" }, { label: "跳过" }] },
@@ -237,7 +237,7 @@ describe("decision cards", () => {
         { id: "next", header: "下一步", prompt: "怎么继续", multi: false, options: [{ label: "回传命令输出" }, { label: "跳过" }] },
       ] },
     } as Extract<Item, { t: "ask" }>;
-    render(<AskCard item={item} onAnswer={vi.fn(pending)} />);
+    render(<AskCard item={item} onAnswer={vi.fn(resolved)} />);
     expect(screen.getByRole("button", { name: /回传命令输出/ }).getAttribute("aria-pressed")).toBe("true");
     expect(screen.getByRole("button", { name: /其他 —— 自行填写/ }).getAttribute("aria-pressed")).toBe("false");
     expect((screen.getByRole("textbox", { name: "补充说明（可选）" }) as HTMLInputElement).value).toBe("exit 1");
@@ -247,7 +247,7 @@ describe("decision cards", () => {
   // by itself, a multi-choice one waits for Next, and Confirm appears only once
   // every question has an answer.
   it("steps through several questions without reaching for the tabs", async () => {
-    const answer = vi.fn(pending);
+    const answer = vi.fn(resolved);
     const item = {
       t: "ask", id: "row", ask: { id: "ask", questions: [
         { id: "mode", header: "方式", prompt: "怎么做", multi: false, options: [{ label: "直接改" }, { label: "先出计划" }] },

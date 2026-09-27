@@ -3,8 +3,53 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { Item } from "../../state/session";
 import { AskCard } from "./AskCard";
+import { boot, STORAGE } from "../../i18n";
+import type { AskReason } from "../../port/session";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  localStorage.removeItem(STORAGE);
+  boot();
+});
+
+it.each([
+  ["user_decision", "Need your decision"],
+  ["missing_value", "Need more information"],
+])("translates the %s ask heading in an English UI", (reason, heading) => {
+  localStorage.setItem(STORAGE, "en");
+  boot();
+  const item = {
+    t: "ask",
+    id: "row",
+    ask: { id: "call_00_x", questions: [{ id: "q1", reason, header: "Choice", prompt: "Choose", options: [] }] },
+  } as Extract<Item, { t: "ask" }>;
+  const { container } = render(<AskCard item={item} onAnswer={vi.fn()} />);
+  expect(container.querySelector(".hl .nm")?.textContent).toBe(heading);
+});
+
+it("keeps the decision heading in Chinese for a Chinese UI", () => {
+  localStorage.setItem(STORAGE, "zh");
+  boot();
+  const item = {
+    t: "ask",
+    id: "row",
+    ask: { id: "call_00_x", questions: [{ id: "q1", reason: "user_decision", header: "Choice", prompt: "Choose", options: [] }] },
+  } as Extract<Item, { t: "ask" }>;
+  const { container } = render(<AskCard item={item} onAnswer={vi.fn()} />);
+  expect(container.querySelector(".hl .nm")?.textContent).toBe("需要你决定");
+});
+
+it("does not expose an unknown reason code in the heading", () => {
+  localStorage.setItem(STORAGE, "en");
+  boot();
+  const item = {
+    t: "ask",
+    id: "row",
+    ask: { id: "call_00_x", questions: [{ id: "q1", reason: "future_reason" as AskReason, header: "Choice", prompt: "Choose", options: [] }] },
+  } as Extract<Item, { t: "ask" }>;
+  const { container } = render(<AskCard item={item} onAnswer={vi.fn()} />);
+  expect(container.querySelector(".hl .nm")?.textContent).toBe("Need your decision");
+});
 
 describe("an ask rebuilt from the record", () => {
   it("shows the question, every option and what the kernel recorded, and offers nothing to answer", () => {
