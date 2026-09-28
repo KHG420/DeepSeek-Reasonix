@@ -43,6 +43,11 @@ Legacy 迁移、OS home 约定目录扫描以及其他 fallback 路径都会跳�
 `<state root>` 默认等于 `<Reasonix home>`；只有设置 `REASONIX_STATE_HOME`
 时才会不同。
 
+项目状态目录会编码路径中的 `-`、`%` 等字符，避免不同工作区路径得到相同名称。
+已有的旧目录保留原位，并通过 `.workspace-root` 标记归属于一个工作区；
+旧名称相同的另一个工作区使用独立目录，不会删除旧文件。如果两个工作区过去
+已经写入同一个旧目录，旧记录仍留在该目录，可能需要人工区分；新记录则分别存储。
+
 Desktop Topic 的标题、标题来源、创建时间和自动标题状态以这些 SQLite 文件为权威存储。
 首次访问时，Desktop 会导入项目 `.reasonix/` 目录（或全局 Reasonix 目录）中的旧
 `desktop-topic-*.json`。检测到旧文件的 scope 会继续镜像旧格式以支持降级；全新 scope

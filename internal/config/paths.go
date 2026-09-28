@@ -523,7 +523,7 @@ func ProjectSessionDir(workspaceRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	return filepath.Join(base, "projects", WorkspaceSlug(root), "sessions")
+	return filepath.Join(ProjectStateDir(base, root), "sessions")
 }
 
 // ProjectSessionStoreDir is the per-workspace execution-v2 session root.
@@ -536,7 +536,7 @@ func ProjectSessionStoreDir(workspaceRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	return filepath.Join(base, "projects", WorkspaceSlug(root), "sessions-v4")
+	return filepath.Join(ProjectStateDir(base, root), "sessions-v4")
 }
 
 // DesktopTopicStatePath returns the authoritative SQLite path for Desktop
@@ -554,17 +554,38 @@ func DesktopTopicStatePath(workspaceRoot string) string {
 	if abs, err := filepath.Abs(root); err == nil {
 		root = abs
 	}
-	return filepath.Join(base, "projects", WorkspaceSlug(root), "desktop", "topic-state-v1.sqlite")
+	return filepath.Join(ProjectStateDir(base, root), "desktop", "topic-state-v1.sqlite")
 }
 
 // WorkspaceSlug flattens an absolute workspace path into the directory name
-// used under <config root>/projects. Windows spells the same folder with
-// varying case (drive-letter case, Explorer renames), so the slug folds case
-// there — matching agent.CanonicalSessionPath's key form — or equivalent
-// spellings of one workspace would produce distinct slug strings. Existing
-// mixed-case slug directories need no migration: NTFS resolves names
-// case-insensitively, so the folded slug opens the same directory.
+// used under <config root>/projects. Escape path characters that otherwise
+// collide with the separator marker: /repo/a-b and /repo/a/b must not share
+// state. Paths without escaped characters keep their historical slug. Windows
+// paths are case-folded so equivalent drive and folder spellings stay together.
 func WorkspaceSlug(absPath string) string {
+	if runtimeGOOS == "windows" {
+		absPath = strings.ToLower(absPath)
+	}
+	var slug string
+	if runtimeGOOS == "windows" {
+		// A drive colon is part of the root and cannot appear in a path segment.
+		drive := ""
+		if len(absPath) >= 2 && absPath[1] == ':' {
+			drive, absPath = absPath[:2], absPath[2:]
+		}
+		slug = strings.NewReplacer("%", "%25", "-", "%2D", "/", "-", "\\", "-", ":", "%3A").Replace(absPath)
+		if drive != "" {
+			slug = strings.ToLower(drive[:1]) + "-" + slug
+		}
+	} else {
+		slug = strings.NewReplacer("%", "%25", "-", "%2D", "/", "-", "\\", "%5C", ":", "%3A").Replace(absPath)
+	}
+	return boundFilenameComponent(slug, 255)
+}
+
+// LegacyWorkspaceSlug locates project state written before separators were
+// escaped. It is lossy and must never be used for new state.
+func LegacyWorkspaceSlug(absPath string) string {
 	if runtimeGOOS == "windows" {
 		absPath = strings.ToLower(absPath)
 	}

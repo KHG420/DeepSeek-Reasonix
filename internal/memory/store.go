@@ -111,7 +111,7 @@ func StoreFor(userDir, cwd string) Store {
 		return Store{}
 	}
 	return Store{
-		Dir:       filepath.Join(userDir, "projects", config.WorkspaceSlug(absOf(cwd)), "memory"),
+		Dir:       filepath.Join(config.ProjectStateDir(userDir, absOf(cwd)), "memory"),
 		GlobalDir: filepath.Join(userDir, "memory", "global"),
 	}
 }

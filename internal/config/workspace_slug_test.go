@@ -28,3 +28,29 @@ func TestWorkspaceSlugPreservesCaseOffWindows(t *testing.T) {
 		t.Fatal("WorkspaceSlug folded case off windows; unix paths are case-sensitive")
 	}
 }
+
+func TestWorkspaceSlugKeepsDifferentWorkspacePathsSeparate(t *testing.T) {
+	setRuntimeGOOS(t, "linux")
+	for _, pair := range [][2]string{
+		{"/repo/front-end/app", "/repo/front/end-app"},
+		{"/repo/a%b", "/repo/a%25b"},
+		{"/repo/a:b", "/repo/a/b"},
+		{"/repo/a\\b", "/repo/a/b"},
+	} {
+		if a, b := WorkspaceSlug(pair[0]), WorkspaceSlug(pair[1]); a == b {
+			t.Errorf("distinct paths %q and %q share slug %q", pair[0], pair[1], a)
+		}
+	}
+}
+
+func TestWorkspaceSlugKeepsWindowsPathsSeparate(t *testing.T) {
+	setRuntimeGOOS(t, "windows")
+	first := WorkspaceSlug(`C:\repo\front-end\app`)
+	second := WorkspaceSlug(`C:\repo\front\end-app`)
+	if first == second {
+		t.Fatalf("different Windows workspaces share slug %q", first)
+	}
+	if WorkspaceSlug(`c:\REPO\FRONT-END\APP`) != first {
+		t.Fatal("equivalent Windows path spellings split state")
+	}
+}

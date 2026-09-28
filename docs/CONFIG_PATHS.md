@@ -52,6 +52,14 @@ non-destructively when `<Reasonix home>/.env` is missing them.
 `<state root>` defaults to `<Reasonix home>`. It only differs when
 `REASONIX_STATE_HOME` is set.
 
+Project state directories encode path characters such as `-` and `%` so two
+different workspace paths cannot flatten to the same slug. An existing legacy
+directory is kept in place and claimed by one workspace using its
+`.workspace-root` marker; a second workspace with the same old slug uses a
+separate directory. No old files are deleted. If two workspaces already wrote
+to one legacy directory, their older records remain together there and may
+need manual sorting; new records are isolated.
+
 Desktop topic titles, title sources, creation times, and automatic-title state
 are authoritative in these SQLite files. On first access, Desktop imports the
 legacy `desktop-topic-*.json` files from a project's `.reasonix/` directory (or

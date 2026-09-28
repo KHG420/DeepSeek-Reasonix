@@ -28,6 +28,46 @@ func TestSessionCatalogTargetsIncludeRestoredProjectTab(t *testing.T) {
 	t.Fatalf("session catalog targets = %#v, want restored project directory %q", app.sessionCatalogTargets(), sessionDir)
 }
 
+func TestProjectSessionCatalogSeparatesCollidingLegacyWorkspaceNames(t *testing.T) {
+	isolateDesktopUserDirs(t)
+	repo := t.TempDir()
+	first := filepath.Join(repo, "front-end", "app")
+	second := filepath.Join(repo, "front", "end-app")
+	app := NewApp()
+	for _, root := range []string{first, second} {
+		if err := os.MkdirAll(root, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstDir := desktopSessionDir(first)
+	secondDir := desktopSessionDir(second)
+	if sameDesktopPath(firstDir, secondDir) {
+		t.Fatalf("different projects share session directory %q", firstDir)
+	}
+	for _, dir := range []string{firstDir, secondDir} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	firstPath := writeTopicSession(t, firstDir, "first.jsonl", "topic-first", "First", first)
+	secondPath := writeTopicSession(t, secondDir, "second.jsonl", "topic-second", "Second", second)
+	installSessionCatalogForTest(t, app, firstDir, "project", first)
+	reconcileSessionCatalogForTest(t, app, secondDir, "project", second)
+	for _, check := range []struct {
+		root, dir, ownPath, otherPath string
+	}{{first, firstDir, firstPath, secondPath}, {second, secondDir, secondPath, firstPath}} {
+		page, err := app.sessionCatalog.Load().ListSessions(t.Context(), sessioncatalog.SessionPageRequest{
+			Scope: "project", WorkspaceRoot: check.root, Directory: check.dir, Limit: 20,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(page.Items) != 1 || page.Items[0].Path != check.ownPath {
+			t.Fatalf("sessions for %q = %#v, want only %q and never %q", check.root, page.Items, check.ownPath, check.otherPath)
+		}
+	}
+}
+
 func waitForCatalogSessionPath(t *testing.T, app *App, workspaceRoot, sessionDir, sessionPath string) sessioncatalog.SessionRecord {
 	t.Helper()
 	deadline := time.Now().Add(15 * time.Second)
