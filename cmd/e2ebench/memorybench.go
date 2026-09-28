@@ -40,7 +40,7 @@ func seedTaskMemory(taskDir, work string) ([]string, error) {
 		absWork = resolved
 	}
 	pairs := [][2]string{
-		{filepath.Join(seeds, "project"), filepath.Join(stateHome, "projects", config.WorkspaceSlug(absWork), "memory")},
+		{filepath.Join(seeds, "project"), filepath.Join(config.ProjectStateDir(stateHome, absWork), "memory")},
 		{filepath.Join(seeds, "global"), filepath.Join(stateHome, "memory", "global")},
 	}
 	for _, pair := range pairs {

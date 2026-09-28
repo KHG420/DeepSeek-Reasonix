@@ -41,9 +41,9 @@ non-destructively when `<Reasonix home>/.env` is missing them.
 | Remote-SSH managed known_hosts | `<Reasonix home>/remote/known_hosts` |
 | Sessions | `<state root>/sessions/` |
 | Archives | `<state root>/archive/` |
-| Memory | `<state root>/memory/` and `<state root>/projects/` |
+| Memory | `<state root>/memory/`, `<state root>/projects/`, and `<state root>/projects-v2/` |
 | Global Desktop topic metadata | `<state root>/desktop/topic-state-v1.sqlite` |
-| Project Desktop topic metadata | `<state root>/projects/<workspace slug>/desktop/topic-state-v1.sqlite` |
+| Project Desktop topic metadata | `<state root>/projects/<legacy slug>/desktop/topic-state-v1.sqlite` or `<state root>/projects-v2/<escaped slug>/desktop/topic-state-v1.sqlite` |
 | Disposable session catalog | `<cache root>/session-catalog/v6.sqlite` |
 | Disposable history search catalog | `<cache root>/history-search/v1.sqlite` |
 | Disposable usage catalog | `<cache root>/usage-catalog/v1.sqlite` |
@@ -53,10 +53,12 @@ non-destructively when `<Reasonix home>/.env` is missing them.
 `REASONIX_STATE_HOME` is set.
 
 Project state directories encode path characters such as `-` and `%` so two
-different workspace paths cannot flatten to the same slug. An existing legacy
-directory is kept in place and claimed by one workspace using its
-`.workspace-root` marker; a second workspace with the same old slug uses a
-separate directory. No old files are deleted. If two workspaces already wrote
+different workspace paths cannot flatten to the same slug. New project state
+directories live under `projects-v2/`, separate from legacy names under
+`projects/`, so a new name cannot collide with another workspace's legacy name. An existing
+legacy directory is kept in place and claimed by one workspace using its
+`.workspace-root` marker; a second workspace with the same old slug uses its
+`projects-v2/` directory. No old files are deleted. If two workspaces already wrote
 to one legacy directory, their older records remain together there and may
 need manual sorting; new records are isolated.
 

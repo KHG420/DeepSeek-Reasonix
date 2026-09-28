@@ -130,6 +130,12 @@ func TestProtectedWritePath(t *testing.T) {
 	if !IsProtectedWritePath(filepath.Join(state, "projects", "slug"), state) {
 		t.Fatal("project state must not be dynamically writable")
 	}
+	if !IsProtectedWritePath(filepath.Join(state, "projects-v2", "slug", "sessions", "a.json"), state) {
+		t.Fatal("escaped project sessions must be protected")
+	}
+	if !IsProtectedWritePath(filepath.Join(state, "projects-v2", "slug"), state) {
+		t.Fatal("escaped project state must not be dynamically writable")
+	}
 	if !IsProtectedWritePath(filepath.Join(state, "settings.json"), state) {
 		t.Fatal("settings.json must be protected")
 	}

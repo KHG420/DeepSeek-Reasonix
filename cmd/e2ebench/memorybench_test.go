@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"reasonix/internal/config"
 )
 
 func TestScanMemoryRecallCountsAndPointOfUse(t *testing.T) {
@@ -78,9 +80,13 @@ func TestSeedTaskMemoryBuildsIsolatedStateRoot(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(stateHome, "memory", "global", "pref.md")); err != nil {
 		t.Fatalf("global seed missing: %v", err)
 	}
-	matches, _ := filepath.Glob(filepath.Join(stateHome, "projects", "*", "memory", "fact.md"))
-	if len(matches) != 1 {
-		t.Fatalf("project seed not under the work dir's slug: %v", matches)
+	resolvedWork, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	projectSeed := filepath.Join(config.ProjectStateDir(stateHome, resolvedWork), "memory", "fact.md")
+	if _, err := os.Stat(projectSeed); err != nil {
+		t.Fatalf("project seed not under the work dir's state path %q: %v", projectSeed, err)
 	}
 
 	if env, err := seedTaskMemory(t.TempDir(), work); err != nil || env != nil {

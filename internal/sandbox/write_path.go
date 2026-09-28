@@ -263,7 +263,8 @@ func IsProtectedWritePath(abs, stateRoot string) bool {
 			return true
 		}
 	}
-	return protectedPathWithin(filepath.Join(stateRoot, "projects"), abs)
+	return protectedPathWithin(filepath.Join(stateRoot, "projects"), abs) ||
+		protectedPathWithin(filepath.Join(stateRoot, "projects-v2"), abs)
 }
 
 func protectedPathWithin(root, path string) bool {

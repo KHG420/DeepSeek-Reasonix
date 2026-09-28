@@ -8,9 +8,10 @@ import (
 
 // ProjectStateDir keeps an existing project on its historical state directory
 // when that directory can be claimed by this workspace. A different workspace
-// with the same lossy legacy slug uses the escaped slug, so new data cannot be
-// written into the other project's state. The legacy directory is never moved
-// or deleted; mixed pre-upgrade records remain on disk under its first owner.
+// with the same lossy legacy slug uses an escaped slug under projects-v2, so
+// neither a new slug nor a legacy slug can name another project's state. The
+// legacy directory is never moved or deleted; mixed pre-upgrade records remain
+// on disk under its first owner.
 func ProjectStateDir(userDir, workspaceRoot string) string {
 	if userDir == "" || strings.TrimSpace(workspaceRoot) == "" {
 		return ""
@@ -22,11 +23,10 @@ func ProjectStateDir(userDir, workspaceRoot string) string {
 	if runtimeGOOS == "windows" {
 		root = strings.ToLower(root)
 	}
-	modern := filepath.Join(userDir, "projects", WorkspaceSlug(root))
-	legacy := filepath.Join(userDir, "projects", LegacyWorkspaceSlug(root))
-	if modern == legacy {
-		return modern
-	}
+	legacySlug := LegacyWorkspaceSlug(root)
+	legacy := filepath.Join(userDir, "projects", legacySlug)
+	newSlug := WorkspaceSlug(root)
+	modern := filepath.Join(userDir, "projects-v2", newSlug)
 	if info, err := os.Stat(legacy); err != nil || !info.IsDir() {
 		return modern
 	}

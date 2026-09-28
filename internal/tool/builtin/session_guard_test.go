@@ -38,6 +38,8 @@ func TestSessionDataGuardDeniesSessionStores(t *testing.T) {
 		projectSession,
 		filepath.Join(root, "sessions", "sub", "new.jsonl"),                     // not-yet-existing file under the store
 		filepath.Join(root, "projects", "any-slug", "sessions", "x.jsonl.meta"), // CAS ledger sidecar
+		filepath.Join(root, "projects", "any-slug", ".workspace-root"),          // legacy owner marker
+		filepath.Join(root, "projects-v2", "escaped-slug", "sessions", "x.jsonl.meta"),
 	} {
 		if err := g.Check(target); err == nil {
 			t.Errorf("Check(%q) = nil, want session-data denial", target)
@@ -117,6 +119,7 @@ func TestSessionDataGuardAllowsOrdinaryStatePaths(t *testing.T) {
 	for _, target := range []string{
 		filepath.Join(root, "config.toml"),                        // config is confine()'s job, not this guard's
 		filepath.Join(root, "projects", "slug", "memory", "a.md"), // memory files are not session data
+		filepath.Join(root, "projects-v2", "slug", "memory", "a.md"),
 		filepath.Join(root, "skills", "demo", "SKILL.md"),
 		filepath.Join(t.TempDir(), "unrelated.txt"),
 	} {

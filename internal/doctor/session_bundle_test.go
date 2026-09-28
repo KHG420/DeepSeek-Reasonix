@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -99,6 +100,18 @@ func TestWriteSessionBundleIncludesRecoveryChain(t *testing.T) {
 	}
 	if manifest.Sessions[0].BranchID != "parent-session-recovery-deadbeef" || manifest.Sessions[0].ParentID != "parent-session" {
 		t.Fatalf("recovery manifest entry = %+v", manifest.Sessions[0])
+	}
+}
+
+func TestSessionBundleSearchDirsIncludesEscapedProjects(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("REASONIX_HOME", home)
+	projectSessions := filepath.Join(home, "projects-v2", "escaped-slug", "sessions")
+	if err := os.MkdirAll(projectSessions, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(sessionBundleSearchDirs(), projectSessions) {
+		t.Fatalf("escaped project sessions %q not discovered", projectSessions)
 	}
 }
 

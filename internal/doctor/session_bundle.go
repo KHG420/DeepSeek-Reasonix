@@ -341,17 +341,19 @@ func sessionBundleSearchDirs() []string {
 		add(config.ProjectSessionDir(cwd))
 	}
 	if root := config.MemoryUserDir(); root != "" {
-		projects := filepath.Join(root, "projects")
-		_ = filepath.WalkDir(projects, func(path string, d os.DirEntry, err error) error {
-			if err != nil || !d.IsDir() {
+		for _, sub := range []string{"projects", "projects-v2"} {
+			projects := filepath.Join(root, sub)
+			_ = filepath.WalkDir(projects, func(path string, d os.DirEntry, err error) error {
+				if err != nil || !d.IsDir() {
+					return nil
+				}
+				if d.Name() == "sessions" {
+					add(path)
+					return filepath.SkipDir
+				}
 				return nil
-			}
-			if d.Name() == "sessions" {
-				add(path)
-				return filepath.SkipDir
-			}
-			return nil
-		})
+			})
+		}
 	}
 	sort.Strings(out)
 	return out

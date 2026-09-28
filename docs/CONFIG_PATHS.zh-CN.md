@@ -34,9 +34,9 @@ Legacy 迁移、OS home 约定目录扫描以及其他 fallback 路径都会跳�
 | 远程 SSH 托管 known_hosts | `<Reasonix home>/remote/known_hosts` |
 | 会话 | `<state root>/sessions/` |
 | 归档 | `<state root>/archive/` |
-| 记忆 | `<state root>/memory/` 与 `<state root>/projects/` |
+| 记忆 | `<state root>/memory/`、`<state root>/projects/` 与 `<state root>/projects-v2/` |
 | 全局 Desktop Topic 元数据 | `<state root>/desktop/topic-state-v1.sqlite` |
-| 项目 Desktop Topic 元数据 | `<state root>/projects/<workspace slug>/desktop/topic-state-v1.sqlite` |
+| 项目 Desktop Topic 元数据 | `<state root>/projects/<旧 slug>/desktop/topic-state-v1.sqlite` 或 `<state root>/projects-v2/<转义 slug>/desktop/topic-state-v1.sqlite` |
 | 可丢弃的会话 Catalog | `<cache root>/session-catalog/v6.sqlite` |
 | 可丢弃的 Task Catalog | `<cache root>/task-catalog/v1.sqlite` |
 
@@ -44,8 +44,9 @@ Legacy 迁移、OS home 约定目录扫描以及其他 fallback 路径都会跳�
 时才会不同。
 
 项目状态目录会编码路径中的 `-`、`%` 等字符，避免不同工作区路径得到相同名称。
+新建项目状态目录位于 `projects-v2/`，与 `projects/` 中的旧名称分开，避免跨版本名称碰撞。
 已有的旧目录保留原位，并通过 `.workspace-root` 标记归属于一个工作区；
-旧名称相同的另一个工作区使用独立目录，不会删除旧文件。如果两个工作区过去
+旧名称相同的另一个工作区使用 `projects-v2/` 中的独立目录，不会删除旧文件。如果两个工作区过去
 已经写入同一个旧目录，旧记录仍留在该目录，可能需要人工区分；新记录则分别存储。
 
 Desktop Topic 的标题、标题来源、创建时间和自动标题状态以这些 SQLite 文件为权威存储。

@@ -8,7 +8,7 @@ import (
 )
 
 // SessionDataGuard rejects agent writes into Reasonix's own session stores:
-// <state root>/sessions and <state root>/projects/<slug>/sessions. The runtime
+// <state root>/sessions and <state root>/projects[-v2]/<slug>/sessions. The runtime
 // is the only writer of those files (CAS ledger + autosave); an agent editing
 // them from inside a chat races the app's own saves, which surfaces to the user
 // as endless "conflict copy" forks — the agent sees its write "not take",
@@ -135,19 +135,25 @@ func (g SessionDataGuard) denies(abs string) bool {
 			return !allowLiftsProtected(allow, target, filepath.Join(root, rel))
 		}
 	}
-	projects := filepath.Join(root, "projects")
-	if !within(projects, target) {
-		return false
+	for _, sub := range []string{"projects", "projects-v2"} {
+		projects := filepath.Join(root, sub)
+		if !within(projects, target) {
+			continue
+		}
+		rel, err := filepath.Rel(projects, target)
+		if err != nil {
+			return false
+		}
+		parts := strings.Split(rel, string(filepath.Separator))
+		if sub == "projects" && len(parts) == 2 && parts[1] == ".workspace-root" {
+			return !allowLiftsProtected(allow, target, filepath.Join(projects, parts[0], parts[1]))
+		}
+		if len(parts) < 2 || parts[1] != "sessions" {
+			return false
+		}
+		return !allowLiftsProtected(allow, target, filepath.Join(projects, parts[0], "sessions"))
 	}
-	rel, err := filepath.Rel(projects, target)
-	if err != nil {
-		return false
-	}
-	parts := strings.Split(rel, string(filepath.Separator))
-	if len(parts) < 2 || parts[1] != "sessions" {
-		return false
-	}
-	return !allowLiftsProtected(allow, target, filepath.Join(projects, parts[0], "sessions"))
+	return false
 }
 
 func foldGuardPaths(stateRoot string, allowRoots []string, abs string) (root string, allow []string, target string) {
@@ -211,7 +217,7 @@ func (g SessionDataGuard) CommandHint(workDir, command string) string {
 				return warn // cwd is already inside a guarded store: every command operates on it
 			}
 			if withinFold(g.stateRoot, absWork) {
-				for _, sub := range []string{"sessions", "projects"} {
+				for _, sub := range []string{"sessions", "projects", "projects-v2"} {
 					rel, err := filepath.Rel(absWork, filepath.Join(g.stateRoot, sub))
 					if err != nil {
 						continue
@@ -263,7 +269,7 @@ func sessionHintNeedles(rawRoot, realRoot string, allowRoots []string) []string 
 		}
 	}
 	for prefix := range prefixes {
-		for _, sub := range []string{"sessions", "projects", "desktop-", "metrics-pending.json", "crash-pending.json"} {
+		for _, sub := range []string{"sessions", "projects", "projects-v2", "desktop-", "metrics-pending.json", "crash-pending.json"} {
 			tree := filepath.Join(prefix, sub)
 			if covered := func() bool {
 				tree := filepath.Join(realRoot, sub)

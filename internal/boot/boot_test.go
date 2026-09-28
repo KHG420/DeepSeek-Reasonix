@@ -3699,7 +3699,7 @@ func TestBuildSkipsLegacySessionMigrationWhenIsolated(t *testing.T) {
 		`{"type":"user.message","id":1,"ts":"t","turn":0,"text":"hello from xdg"}`+"\n"+
 			`{"type":"model.final","id":2,"ts":"t","turn":0,"content":"hi from xdg","toolCalls":[],"usage":{},"costUsd":0}`+"\n")
 
-	slug := config.WorkspaceSlug(proj)
+	slug := config.LegacyWorkspaceSlug(proj)
 	legacyProjectDir := filepath.Join(legacyRoot, "projects", slug, "sessions")
 	session := agent.NewSession("")
 	session.Add(provider.Message{Role: provider.RoleUser, Content: "hello from old project session"})
