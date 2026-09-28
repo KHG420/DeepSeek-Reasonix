@@ -512,7 +512,7 @@ func StatsDir() string {
 }
 
 // ProjectSessionDir is the per-workspace session directory the desktop sidebar
-// lists: <state root>/projects/<slug>/sessions. Empty when either the state root
+// lists: <state root>/projects[-v2]/<slug>/sessions. Empty when either the state root
 // or workspaceRoot doesn't resolve.
 func ProjectSessionDir(workspaceRoot string) string {
 	base := MemoryUserDir()
@@ -558,7 +558,7 @@ func DesktopTopicStatePath(workspaceRoot string) string {
 }
 
 // WorkspaceSlug flattens an absolute workspace path into the directory name
-// used under <config root>/projects. Escape path characters that otherwise
+// used under <state root>/projects-v2. Escape path characters that otherwise
 // collide with the separator marker: /repo/a-b and /repo/a/b must not share
 // state. Paths without escaped characters keep their historical slug. Windows
 // paths are case-folded so equivalent drive and folder spellings stay together.

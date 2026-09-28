@@ -27,7 +27,7 @@ import (
 // current project or every project, while Type only classifies its contents.
 // List() and Index() merge both directories so every session sees the full set.
 type Store struct {
-	Dir       string // ...reasonix/projects/<slug>/memory
+	Dir       string // ...reasonix/projects[-v2]/<slug>/memory
 	GlobalDir string // ...reasonix/memory/global (shared across projects)
 }
 
@@ -103,7 +103,7 @@ type ArchivedMemory struct {
 }
 
 // StoreFor resolves the auto-memory directory for a project working dir under
-// Reasonix home, e.g. ~/.reasonix/projects/-Users-me-proj/memory.
+// Reasonix home, e.g. ~/.reasonix/projects-v2/-Users-me-proj/memory.
 // A "" userDir (config dir unresolvable) yields a zero Store, which all methods
 // treat as a disabled no-op.
 func StoreFor(userDir, cwd string) Store {
