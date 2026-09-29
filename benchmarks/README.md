@@ -593,6 +593,13 @@ e2ebench -suite benchmarks/memorybench -budget 0 -policy memory-off -trajectorie
 e2ebench -mode compare on.json off.json     # Memory utility section
 ```
 
+MemoryBench requires an OS read sandbox. It runs on macOS and Linux and
+refuses to start on Windows, where the benchmark cannot isolate the committed
+`tasks/<id>/memory/` answers from a graded agent. Each run also audits every
+recorded trajectory leg for a successful read of those answers; an answer read
+invalidates the result and makes the suite command exit nonzero. Trajectories
+are captured temporarily for this audit when `-trajectories` is omitted.
+
 Utility delta = paired Pass(on) − Pass(off). Harmful attribution is paired,
 never judged: the same task passed without memory and failed with it while
 recall fired. Scenario classes: exact, paraphrase, cjk, symbol, distractor
