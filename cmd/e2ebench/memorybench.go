@@ -79,8 +79,10 @@ func taskExperimentEnv(cfg suiteConfig, t task, work string) (env []string, clea
 	}
 	cleanup = func() { _ = os.RemoveAll(stateHome); _ = os.RemoveAll(tmpDir) }
 	env = append(env, "TMPDIR="+tmpDir)
-	if err := seedTaskMemory(t.dir, work, stateHome); err != nil {
-		return env, cleanup, "memory seed: " + err.Error()
+	if cfg.policy != "memory-off" {
+		if err := seedTaskMemory(t.dir, work, stateHome); err != nil {
+			return env, cleanup, "memory seed: " + err.Error()
+		}
 	}
 	return env, cleanup, ""
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"reasonix/internal/base/testenv"
+	"reasonix/internal/contract/config"
 )
 
 func TestScanMemoryRecallCountsAndPointOfUse(t *testing.T) {
@@ -129,5 +130,53 @@ func TestTaskExperimentEnvIsolatesEveryRun(t *testing.T) {
 	// no-solution task find the dependency an earlier run compiled for itself.
 	if len(roots) != 4 {
 		t.Fatalf("two tasks did not get four distinct roots: %v", roots)
+	}
+}
+
+func TestMemoryOffExperimentHasNoSeededStoreOnDisk(t *testing.T) {
+	taskDir := testenv.TempDir(t)
+	work := testenv.TempDir(t)
+	resolvedWork, err := filepath.EvalSymlinks(work)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, seed := range []string{"project/fact.md", "global/pref.md"} {
+		path := filepath.Join(taskDir, "memory", seed)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("seeded fact"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, policy := range []string{"memory-off", ""} {
+		env, drop, note := taskExperimentEnv(suiteConfig{policy: policy}, task{dir: taskDir}, work)
+		if note != "" {
+			drop()
+			t.Fatalf("policy %q: %s", policy, note)
+		}
+		stateHome := ""
+		for _, entry := range env {
+			if path, ok := strings.CutPrefix(entry, "REASONIX_STATE_HOME="); ok {
+				stateHome = path
+			}
+		}
+		if stateHome == "" {
+			drop()
+			t.Fatalf("policy %q has no state root", policy)
+		}
+		for _, path := range []string{
+			filepath.Join(stateHome, "memory", "global", "pref.md"),
+			filepath.Join(stateHome, "projects", config.WorkspaceSlug(resolvedWork), "memory", "fact.md"),
+		} {
+			_, err := os.Stat(path)
+			if policy == "memory-off" && !os.IsNotExist(err) {
+				t.Errorf("memory-off can read seeded fact %q: %v", path, err)
+			}
+			if policy != "memory-off" && err != nil {
+				t.Errorf("memory-on seed %q missing: %v", path, err)
+			}
+		}
+		drop()
 	}
 }
