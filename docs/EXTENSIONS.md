@@ -18,6 +18,8 @@ Two kinds of plugin capabilities exist:
 
 Extensions install exactly like any plugin package:
 
+Market reviewers can use the [version-specific review worksheet](MARKET_REVIEW_GUIDE.md) to record source, install, capability, and task evidence before recommending a package.
+
 ```bash
 reasonix plugin install git:github.com/owner/extension --dry-run   # preview
 reasonix plugin install git:github.com/owner/extension --yes       # install
