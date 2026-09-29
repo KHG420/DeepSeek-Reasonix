@@ -58,6 +58,9 @@ func (*AwaitUserTool) Execute(ctx context.Context, args json.RawMessage) (string
 	if need == "" {
 		return "", fmt.Errorf("await_user needs a `need`: say what you are waiting for the user to give you")
 	}
+	if strings.ContainsAny(need, "\r\n") || strings.Contains(need, `\n`) || strings.Contains(need, `\r`) {
+		return "", fmt.Errorf("`need` is shown as one line; remove line breaks and escaped newline sequences, and put the substance in your reply")
+	}
 	if n := utf8.RuneCountInString(need); n > awaitUserNeedLimit {
 		return "", fmt.Errorf("`need` is %d characters and is shown to the user as a one-line status, so it holds at most %d; put the substance in your reply, and if you are offering choices call ask with them as options instead", n, awaitUserNeedLimit)
 	}

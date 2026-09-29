@@ -67,6 +67,14 @@ func TestAwaitUserRejectsWhatItCannotPark(t *testing.T) {
 			todos: newsList(), interactive: true,
 			args: `{"need":"` + strings.Repeat("选", awaitUserNeedLimit+1) + `"}`, want: "call ask",
 		},
+		"actual newline in need": {
+			todos: newsList(), interactive: true,
+			args: `{"need":"first\nsecond"}`, want: "one line",
+		},
+		"escaped newline in need": {
+			todos: newsList(), interactive: true,
+			args: `{"need":"first\\nsecond"}`, want: "one line",
+		},
 		"unknown step": {
 			todos: newsList(), interactive: true,
 			args: `{"step_id":"n9","need":"your view"}`, want: "n1, n2",
