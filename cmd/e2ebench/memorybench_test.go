@@ -3,12 +3,41 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"reasonix/internal/base/testenv"
 )
+
+func TestContradictionGraderAcceptsOnlyPnpmInstall(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash unavailable")
+	}
+	taskDir := "../../benchmarks/memorybench/tasks/mb-contradiction"
+	for _, tc := range []struct {
+		name, answer string
+		wantPass     bool
+	}{
+		{"pnpm", "pnpm install\n", true},
+		{"pnpm with flags", "pnpm install --frozen-lockfile\n", true},
+		{"npm", "npm install\n", false},
+		{"both commands", "pnpm install\nnpm install\n", false},
+		{"both commands same line", "pnpm install && npm install\n", false},
+		{"prose", "use pnpm to install\n", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			work := stageSeed(t, taskDir)
+			if err := os.WriteFile(filepath.Join(work, "answer.txt"), []byte(tc.answer), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if err := gradeSeed(t, work); (err == nil) != tc.wantPass {
+				t.Fatalf("answer %q graded pass=%t, want %t: %v", tc.answer, err == nil, tc.wantPass, err)
+			}
+		})
+	}
+}
 
 func TestScanMemoryRecallCountsAndPointOfUse(t *testing.T) {
 	dir := testenv.TempDir(t)

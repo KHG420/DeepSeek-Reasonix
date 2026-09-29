@@ -1,3 +1,4 @@
 #!/usr/bin/env bash
 set -e
-grep -q "pnpm install" answer.txt && ! grep -q "npm install" answer.txt
+grep -Eq '^[[:space:]]*pnpm[[:space:]]+install([[:space:]]|$)' answer.txt &&
+  ! grep -Eq '(^|[^[:alnum:]_])npm[[:space:]]+install([[:space:]]|$)' answer.txt
