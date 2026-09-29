@@ -58,7 +58,7 @@ export interface Quote {
  *  bar draws only what it can actually do. */
 export interface ReplyActions {
   onQuote: (text: string, id: string) => void;
-  onRegenerate?: () => void;
+  regenerateFor?: (id: string) => (() => void) | undefined;
   model?: string;
   onConfigureModel?: () => void;
   onRunDetail?: () => void;
@@ -98,6 +98,7 @@ export function SayCard({ item, afterAnswer, reply }: { item: Extract<Item, { t:
   // first answer token, measured — so it gets the same paced reveal the answer
   // does rather than tracking the wire's bursts.
   const thought = useRevealed(item.reasoning ?? "", !item.done);
+  const regenerate = reply?.regenerateFor?.(item.id);
   return (
     <div className="call" data-k="say">
       <div className="g">
@@ -141,7 +142,7 @@ export function SayCard({ item, afterAnswer, reply }: { item: Extract<Item, { t:
                   <StudioIcon name="quote" />
                 </button>
               )}
-              {reply?.onRegenerate && (
+              {reply && regenerate && (
                 <span className="acts-menu">
                   <button type="button" data-action="reply.retry" title={t("重新生成")} aria-label={t("重新生成")} aria-expanded={menu === "retry"} onClick={() => setMenu((m) => (m === "retry" ? "" : "retry"))}>
                     <StudioIcon name="refresh" />
@@ -149,7 +150,7 @@ export function SayCard({ item, afterAnswer, reply }: { item: Extract<Item, { t:
                   {menu === "retry" && (
                     <div className="acts-pop" role="menu">
                       <div className="acts-pop-head">{t("重新生成")}<small>{t("当前回复会留在运行历史里")}</small></div>
-                      <button type="button" role="menuitem" data-action="reply.retry-now" onClick={() => { setMenu(""); reply.onRegenerate?.(); }}>
+                      <button type="button" role="menuitem" data-action="reply.retry-now" onClick={() => { setMenu(""); regenerate(); }}>
                         <StudioIcon name="refresh" /><span>{t("按当前配置重试")}</span>{reply.model && <small>{reply.model}</small>}
                       </button>
                       {reply.onConfigureModel && (

@@ -42,29 +42,29 @@ export function useReplyActions({ port, items, checkpoints, running, model, subm
     [port, submit, onError],
   );
 
-  // The last thing the person said, and the turn the kernel gave it. A reply is
-  // re-run by sending that again, so a transcript with no checkpoint behind it
-  // offers no regenerate rather than a button that answers with an error. The
-  // pairing is the transcript's own: a rebuilt row carries msgIndex and no
-  // authored turn, so matching on the latter found nothing in a reopened
-  // session — which is most of them.
-  const lastAsk = useMemo(() => {
-    const paired = pairCheckpoints(items, checkpoints);
-    for (let i = items.length - 1; i >= 0; i--) {
-      const item = items[i];
-      if (item.t !== "user" || item.pending) continue;
-      const cp = paired.get(item.id);
-      return cp ? { turn: cp.turn, text: item.text } : undefined;
+  // Rebuilt rows carry msgIndex rather than an authored turn. The checkpoint
+  // join gives each reply its own user turn; falling back to the latest user
+  // would regenerate the wrong part of a multi-turn conversation.
+  const paired = useMemo(() => pairCheckpoints(items, checkpoints), [items, checkpoints]);
+  const askOfReply = useMemo(() => {
+    const byReply = new Map<string, { turn: number; text: string }>();
+    let ask: { turn: number; text: string } | undefined;
+    for (const item of items) {
+      if (item.t === "user" && !item.pending) {
+        const cp = paired.get(item.id);
+        ask = cp ? { turn: cp.turn, text: item.text } : undefined;
+      } else if (item.t === "say" && ask) {
+        byReply.set(item.id, ask);
+      }
     }
-    return undefined;
-  }, [items, checkpoints]);
+    return byReply;
+  }, [items, paired]);
 
   // Which reply is being quoted is the kernel's to say, so the turn its
   // checkpoint named travels with the text. A transcript rebuilt without
   // checkpoints has no turn to give and sends none rather than a guess.
   const turnOf = useCallback(
     (id: string) => {
-      const paired = pairCheckpoints(items, checkpoints);
       const at = items.findIndex((i) => i.id === id);
       for (let i = at < 0 ? items.length - 1 : at; i >= 0; i--) {
         const item = items[i];
@@ -73,18 +73,21 @@ export function useReplyActions({ port, items, checkpoints, running, model, subm
       }
       return undefined;
     },
-    [items, checkpoints],
+    [items, paired],
   );
 
   const reply = useMemo<ReplyActions>(
     () => ({
       onQuote: (text: string, id: string) => setQuote((q) => ({ text, turn: turnOf(id), n: q.n + 1 })),
-      onRegenerate: lastAsk && !running ? () => void regenerate(lastAsk.turn, lastAsk.text) : undefined,
+      regenerateFor: !running ? (id: string) => {
+        const ask = askOfReply.get(id);
+        return ask ? () => void regenerate(ask.turn, ask.text) : undefined;
+      } : undefined,
       model,
       onConfigureModel: () => onSettings("model"),
       onRunDetail,
     }),
-    [lastAsk, running, regenerate, model, onSettings, onRunDetail, turnOf],
+    [askOfReply, running, regenerate, model, onSettings, onRunDetail, turnOf],
   );
 
   // Rewriting a message is the same act with different words: the turn goes
