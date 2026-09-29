@@ -10,6 +10,29 @@ import { WorkbenchPanel } from "./WorkbenchPanel";
 afterEach(cleanup);
 
 describe("WorkbenchPanel", () => {
+  it("lets the reader reveal and hide the .reasonix folder without revealing other dot folders", async () => {
+    const user = userEvent.setup();
+    const port = new MockPort();
+    vi.spyOn(port, "workspaceFiles").mockImplementation(async (path) =>
+      path === ".reasonix"
+        ? { files: [".reasonix/config.toml"], directories: [".reasonix/sessions"] }
+        : { files: ["README.md"], directories: [] },
+    );
+    render(<WorkbenchPanel port={port} tabs={[]} manual={false} shown scheme="light" changes={[]} onCloseManual={vi.fn()} onSurfaces={vi.fn()} onExternal={vi.fn()} />);
+
+    await screen.findByRole("button", { name: "README.md" });
+    expect(screen.queryByRole("button", { name: ".reasonix" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "显示 .reasonix 文件夹" }));
+    await user.click(await screen.findByRole("button", { name: ".reasonix" }));
+    expect(await screen.findByRole("button", { name: "config.toml" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: ".git" })).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: "隐藏 .reasonix 文件夹" }));
+    expect(screen.queryByRole("button", { name: ".reasonix" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "config.toml" })).toBeNull();
+    expect(screen.getByRole("button", { name: "README.md" })).toBeTruthy();
+  });
+
   it("opens workspace files as tabs and saves what was typed in the editor", async () => {
     const user = userEvent.setup();
     const port = new MockPort();

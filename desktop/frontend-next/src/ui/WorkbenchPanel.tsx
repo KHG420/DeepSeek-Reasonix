@@ -12,6 +12,7 @@ import type {
 import { AgentBrowserPanel, ManualBrowserPanel, UNREAD_TABS } from "./BrowserPanel";
 import { DiffView } from "./cards/DiffView";
 import { StudioIcon } from "./StudioIcon";
+import { WorkbenchReasonixToggle } from "./WorkbenchReasonixToggle";
 import { LazyMarkdown } from "./LazyMarkdown";
 import type { LocalRefs } from "./Markdown";
 import { docRef } from "./docrefs";
@@ -138,7 +139,7 @@ export function WorkbenchPanel({
   // Docked, the body is too narrow for two columns, so the explorer is hidden
   // — and the workbench is always docked now, which left the files with no way
   // in at all. The toggle is that way in, at any width.
-  const [showFiles, setShowFiles] = useState(false);
+  const [showFiles, setShowFiles] = useState(false), [showReasonix, setShowReasonix] = useState(false);
   const [query, setQuery] = useState(""),
     [selected, setSelected] = useState("");
   const [dismissed, setDismissed] = useState<Set<string>>(() => new Set()),
@@ -203,9 +204,6 @@ export function WorkbenchPanel({
   const changeKey = changes
     .map((change) => `${change.status}:${change.path}`)
     .join("\n");
-  // The kernel reads the disk on every listing and keeps nothing, so the tree is
-  // only as stale as the last time it asked. A delete in another application
-  // tells nobody here; looking back at the window is when it can have happened.
   const glance = useGlance();
   useEffect(() => {
     if (!shown) return;
@@ -215,6 +213,11 @@ export function WorkbenchPanel({
         const top = await port.workspaceFiles("", query);
         let files = top.files;
         let dirs = top.directories;
+        let reasonix: { files: string[]; directories: string[] } | undefined, reasonixError = "";
+        if (showReasonix && !query) {
+          try { reasonix = await port.workspaceFiles(".reasonix"); dirs = [...dirs, ".reasonix"]; }
+          catch (e) { reasonixError = reason(e); }
+        }
         // A reload is the tree read again, not the reader's place in it lost:
         // the folders they had open are read again, parents before children,
         // and one that is gone or unreadable now simply closes.
@@ -224,7 +227,7 @@ export function WorkbenchPanel({
           for (const path of [...openFolders.current].sort((a, b) => depth(a) - depth(b))) {
             if (!dirs.includes(path)) continue;
             try {
-              const inner = await port.workspaceFiles(path);
+              const inner = path === ".reasonix" && reasonix ? reasonix : await port.workspaceFiles(path);
               files = [...files, ...inner.files];
               dirs = [...dirs, ...inner.directories];
               open.add(path);
@@ -237,7 +240,7 @@ export function WorkbenchPanel({
         setFiles([...new Set(files)]);
         setDirectories([...new Set(dirs)]);
         setCollapsed(query ? new Set() : new Set(dirs.filter((path) => !open.has(path))));
-        setListFailed("");
+        setListFailed(reasonixError);
       } catch (e) {
         if (live) setListFailed(reason(e));
       }
@@ -245,7 +248,7 @@ export function WorkbenchPanel({
     return () => {
       live = false;
     };
-  }, [port, shown, changeKey, query, glance, running, wrote]);
+  }, [port, shown, changeKey, query, glance, running, wrote, showReasonix]);
   // The button in the chrome says "show me the browser", not "show me this one
   // browser". When the agent has a page, that page is the browser; the start
   // page is only for an empty column, and steps aside unused once the agent
@@ -646,6 +649,7 @@ export function WorkbenchPanel({
           <div className="workbench-explorer-head">
             <span>{t("资源管理器")}</span>
             <small>{files.length + directories.length}</small>
+            <WorkbenchReasonixToggle shown={showReasonix} onToggle={() => { setQuery(""); setShowReasonix((shown) => !shown); }} />
             {/* Beside the files rather than in settings: this is the one place
                 the workspace is already what you are looking at. */}
             <button
