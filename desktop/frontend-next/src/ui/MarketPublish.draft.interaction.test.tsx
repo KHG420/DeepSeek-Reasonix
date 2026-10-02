@@ -43,8 +43,16 @@ it.each(["zh", "en"].flatMap((lang) => ["public", "private"].flatMap((visibility
   const pending = deferred<MarketPublished>();
   const publish = vi.spyOn(port, "publishMarket").mockImplementationOnce(() => pending.promise).mockResolvedValue(receipt);
   render(<PublishForm port={port} handle="demo" onMine={() => {}} />);
+  const publicSummary = lang === "zh"
+    ? "以 @demo 的名义提交，审核通过后公开。只收来源地址，不上传文件。"
+    : "Submitted as @demo and made public once approved. Only the source address is sent; no files are uploaded.";
+  const privateSummary = lang === "zh"
+    ? "以 @demo 的名义保存，仅自己可见，不提交审核。只收来源地址，不上传文件。"
+    : "Saved as @demo, visible only to you and not submitted for review. Only the source address is sent; no files are uploaded.";
+  expect(screen.getByText(publicSummary)).toBeTruthy();
   for (const [name, value] of Object.entries(values)) fireEvent.change(field(name), { target: { value } });
   if (visibility === "private") await userEvent.click(screen.getByRole("checkbox"));
+  expect(screen.getByText(visibility === "private" ? privateSummary : publicSummary)).toBeTruthy();
   await userEvent.click(screen.getByRole("button", { name: t(visibility === "private" ? "保存为私有" : "提交审核") }));
 
   for (const name of Object.keys(values)) await userEvent.type(field(name), "edited");
@@ -55,6 +63,7 @@ it.each(["zh", "en"].flatMap((lang) => ["public", "private"].flatMap((visibility
   const kind = screen.getByRole("radio", { name: t("技能") }).getAttribute("aria-checked");
   const privateDraft = screen.getByRole<HTMLInputElement>("checkbox").checked;
   const busy = document.querySelector(".mkt-pub")!.getAttribute("aria-busy");
+  expect(screen.getByText(visibility === "private" ? privateSummary : publicSummary)).toBeTruthy();
   await act(async () => {
     if (outcome === "success") pending.resolve(receipt);
     else pending.reject(new Error("registry temporarily unavailable"));
@@ -72,6 +81,7 @@ it.each(["zh", "en"].flatMap((lang) => ["public", "private"].flatMap((visibility
     await userEvent.type(field("来源地址"), "https://github.com/demo/fixed-kit");
     await userEvent.click(screen.getByRole("radio", { name: t("主题") }));
     await userEvent.click(screen.getByRole("checkbox"));
+    expect(screen.getByText(visibility === "private" ? publicSummary : privateSummary)).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: t(visibility === "private" ? "提交审核" : "保存为私有") }));
     expect(publish).toHaveBeenCalledTimes(2);
     expect(publish).toHaveBeenLastCalledWith({
@@ -85,5 +95,6 @@ it.each(["zh", "en"].flatMap((lang) => ["public", "private"].flatMap((visibility
     for (const name of Object.keys(values)) expect(field(name).value).toBe("");
     expect(screen.getByRole<HTMLInputElement>("checkbox").checked).toBe(false);
     expect(screen.getByRole("radio", { name: t("技能") }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText(publicSummary)).toBeTruthy();
   }
 });

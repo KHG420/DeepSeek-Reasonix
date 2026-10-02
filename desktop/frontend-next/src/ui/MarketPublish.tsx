@@ -106,7 +106,9 @@ function PublishDraft({ port, handle, onMine }: PublishProps) {
   const ready = d.name.trim() !== "" && d.source.trim() !== "" && !busy;
   return (
     <div className="mkt mkt-pub" aria-busy={busy}>
-      <p className="mkt-sum">{t("以 @{handle} 的名义提交，审核通过后公开。只收来源地址，不上传文件。", { handle })}</p>
+      <p className="mkt-sum">{t(d.private
+        ? "以 @{handle} 的名义保存，仅自己可见，不提交审核。只收来源地址，不上传文件。"
+        : "以 @{handle} 的名义提交，审核通过后公开。只收来源地址，不上传文件。", { handle })}</p>
       <div className="seg" data-text role="radiogroup" aria-label={t("类型")}>
         {KINDS.map(([id, name]) => (
           <button key={id} role="radio" aria-checked={d.kind === id} disabled={busy} data-action="market.draft" data-value="kind" onClick={() => setD({ ...d, kind: id })}>
