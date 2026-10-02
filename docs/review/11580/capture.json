@@ -1,0 +1,61 @@
+{
+  "pullRequest": 11580,
+  "source": {
+    "before": "631bd6b1116cc191b9227f83a7a2d83d1a663e46",
+    "after": "4d9ba18ae0f759136d58f5734a44eb700ab5ea66"
+  },
+  "capture": "Existing user Chrome; one reused local fixture tab; actual PR component and shipped styles; English light/dark; rectangle crop only, no page pixels modified. Browser chrome, other tabs and unrelated extension overlay excluded.",
+  "fixture": "Two private packages; first submitMarket Promise stays pending; all requests local and controlled.",
+  "assertion": "Other submit button enabled before, disabled after; Install remains available.",
+  "images": [
+    {
+      "file": "before-light.png",
+      "sha256": "dd404ab5d3022e373942a01d6a1038acfae150d8b377b59727e53fbe83ca624a",
+      "revision": "before",
+      "theme": "light",
+      "crop": [
+        280,
+        100,
+        1280,
+        520
+      ]
+    },
+    {
+      "file": "before-dark.png",
+      "sha256": "b0d3371bec17878bb87fdf2a581b0b9b358a1cc03d18507965ddcb9a984f462e",
+      "revision": "before",
+      "theme": "dark",
+      "crop": [
+        280,
+        100,
+        1280,
+        520
+      ]
+    },
+    {
+      "file": "after-light.png",
+      "sha256": "0679cc0eb3f074255fd3bce03a027ef87eaf58e7fc6d01810c1a81dec6f5d266",
+      "revision": "after",
+      "theme": "light",
+      "crop": [
+        280,
+        100,
+        1280,
+        520
+      ]
+    },
+    {
+      "file": "after-dark.png",
+      "sha256": "ada85219a20ae77938bf39ddf3e50c99fbc714e162aa53ac125725a8b830440a",
+      "revision": "after",
+      "theme": "dark",
+      "crop": [
+        280,
+        100,
+        1280,
+        520
+      ]
+    }
+  ],
+  "limits": "Component evidence; no live registry/native install/full desktop E2E is claimed."
+}

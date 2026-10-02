@@ -1,0 +1,61 @@
+{
+  "pullRequest": 11651,
+  "source": {
+    "before": "c0a7ebe10d4165a256079b78670cec21fb45e5f5",
+    "after": "c9f698352f22d3dfb9d6707850346ab2aaf4c770"
+  },
+  "capture": "Existing user Chrome; one reused local fixture tab; actual PR component and shipped styles; English light/dark; rectangle crop only, no page pixels modified. Browser chrome, other tabs and unrelated extension overlay excluded.",
+  "fixture": "Actual AddPlugin update flow returns the structured failed install plan; all plan/install responses local and controlled.",
+  "assertion": "Done only before; primary focused Retry and secondary Done after.",
+  "images": [
+    {
+      "file": "before-light.png",
+      "sha256": "f7c306375b65f0efee3bd067e732a6a92b2574571a890ec0d7fc745639b5dc4c",
+      "revision": "before",
+      "theme": "light",
+      "crop": [
+        280,
+        100,
+        1280,
+        590
+      ]
+    },
+    {
+      "file": "before-dark.png",
+      "sha256": "333d176cef003ac5a22ec6c4d0057fa54e88304febcc4d2d670757f9f7f76c49",
+      "revision": "before",
+      "theme": "dark",
+      "crop": [
+        280,
+        100,
+        1280,
+        590
+      ]
+    },
+    {
+      "file": "after-light.png",
+      "sha256": "e8ce04e8c73be261800c2be38d125860a1628a2699599c5f58a3c3e0799f5f38",
+      "revision": "after",
+      "theme": "light",
+      "crop": [
+        280,
+        100,
+        1280,
+        590
+      ]
+    },
+    {
+      "file": "after-dark.png",
+      "sha256": "3eb59b73300a81bd0439f9e793e2d8f2c59fcbf8264dab84964e33d5ff7c5f3b",
+      "revision": "after",
+      "theme": "dark",
+      "crop": [
+        280,
+        100,
+        1280,
+        590
+      ]
+    }
+  ],
+  "limits": "Component evidence; no live registry/native install/full desktop E2E is claimed."
+}
