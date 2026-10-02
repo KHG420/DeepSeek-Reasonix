@@ -1,0 +1,60 @@
+{
+  "pr": 11716,
+  "base": "77990ed9ebd44e0cd52d432062fc74393bb09c95",
+  "head": "d2ed8207957991fa6f61bbf798a13f3eafc12400",
+  "browser": "existing Chrome, PID 64948",
+  "page": "single local preview tab",
+  "surface": "real MarketGroup/PublishForm and shipped styles; fixture account; publication disabled",
+  "zoom": "existing 90%",
+  "imageProcessing": "rectangular crop only; browser chrome, other tabs and unrelated extension overlay excluded; no webpage pixels rewritten",
+  "screenshots": [
+    {
+      "file": "before-light.png",
+      "rawScreenshot": "/tmp/reasonix-11716-before-light-raw.png",
+      "rawSHA256": "b3fe4be3eef2386bce571574d6612592180329a8ab16bedff06fc2c8d9debc4b",
+      "crop": [
+        330,
+        164,
+        1250,
+        940
+      ],
+      "sha256": "12322e571a1d5f36bb113b29eafb71c8228fda4763378e2e8d70d08a1e0c13e5"
+    },
+    {
+      "file": "before-dark.png",
+      "rawScreenshot": "/tmp/reasonix-11716-before-dark-raw.png",
+      "rawSHA256": "41cf410499e4cc17c8903247b4cd3463b82d637f21f62b5802cf572aab4a8840",
+      "crop": [
+        330,
+        164,
+        1250,
+        940
+      ],
+      "sha256": "2521d252f65840a71d94c10eaa25267b41700acbab25fcce3ff511fb56fff1ff"
+    },
+    {
+      "file": "after-light.png",
+      "rawScreenshot": "/tmp/reasonix-11716-after-light-raw.png",
+      "rawSHA256": "3be38325b9c5960a79fa392b5fc75ea99485b10d1ae8e69d193af04fdbdbe928",
+      "crop": [
+        330,
+        164,
+        1250,
+        940
+      ],
+      "sha256": "5706e948b5e3d6dcb4a86b78bd2d9e1e4f8e2d7409b6f9c9141cb6b142242d03"
+    },
+    {
+      "file": "after-dark.png",
+      "rawScreenshot": "/tmp/reasonix-11716-after-dark-raw.png",
+      "rawSHA256": "597cfe524be6f674c9a8060cb25eeaf059451a41b175f1f1ff2d4d43e849d91d",
+      "crop": [
+        330,
+        164,
+        1250,
+        940
+      ],
+      "sha256": "ce02fafba52701ba880ed131202430ee97b9f5f66bafab64b3168c891ac2b8b0"
+    }
+  ]
+}
