@@ -5,11 +5,31 @@ import userEvent from "@testing-library/user-event";
 import "./testkit";
 import { Packages } from "./Packages";
 import { MockPort } from "../port/mock";
-import type { AgentPort, PluginExport, PluginPlan } from "../port/port";
+import type { AgentPort, PluginExport, PluginHook, PluginPackage, PluginPlan } from "../port/port";
 
 afterEach(cleanup);
 
 describe("installed package operations", () => {
+  it.each(["context", "command"])("replaces repeated %s hooks without retaining removed rows", (kind) => {
+    const port = new MockPort() as unknown as AgentPort;
+    const hooks: PluginHook[] = ["first", "second", "third"].map((name) => kind === "context"
+      ? { event: "SessionStart", contextFile: `${name}.md` }
+      : { event: "PreToolUse", command: "scripts/check", match: name, description: `${name} check` });
+    const pkg: PluginPackage = { name: "hook-kit", root: "/fixture/hook-kit", enabled: true, hooks };
+    const props = { port, onChanged: vi.fn(), updating: "", onUpdate: vi.fn() };
+    const view = render(<Packages {...props} packages={[pkg]} />);
+    const rows = () => Array.from(view.container.querySelectorAll(".peek [data-run]"), (row) => row.textContent);
+    expect(rows()).toHaveLength(3);
+
+    view.rerender(<Packages {...props} packages={[{ ...pkg, hooks: [{ event: "UserPromptSubmit", contextFile: "current.md" }] }]} />);
+    expect(rows()).toEqual(["▸UserPromptSubmitcurrent.md"]);
+
+    view.rerender(<Packages {...props} packages={[{ ...pkg, hooks }]} />);
+    expect(rows()).toHaveLength(3);
+    view.rerender(<Packages {...props} packages={[{ ...pkg, hooks: [] }]} />);
+    expect(rows()).toEqual([]);
+  });
+
   it.each(["remove", "export"])("blocks conflicting row actions during %s and recovers after failure", async (operation) => {
     const port = new MockPort() as unknown as AgentPort;
     const packages = await port.plugins();
