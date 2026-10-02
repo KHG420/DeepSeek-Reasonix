@@ -1,8 +1,17 @@
+---
+owner: @SivanCola
+backup: @esengine
+status: active
+reviewed: 2026-10-02
+---
+
 # Starter Extension
 
 This directory is a complete, installable Extension Protocol v2 plugin. Its
-sidecar intercepts `input.receive`; text beginning with `starter: ` is passed to
-the model with ` [rewritten by starter-extension]` appended.
+sidecar intercepts `input.receive`; while enabled, it appends
+` [rewritten by starter-extension]` to every non-empty input payload.
+It preserves the complete text, including any context the host has composed
+before calling the interceptor.
 
 The `.exe` suffix is intentional: using one fixed runtime path keeps the
 manifest identical on every platform. Unix executes the binary normally, and
@@ -35,12 +44,45 @@ Reasonix sandbox.
 Start a new session, or run `/reload` while the current session is idle. Send:
 
 ```text
-starter: explain what an Extension Protocol sidecar does
+explain what an Extension Protocol sidecar does
 ```
 
-The model receives the rewritten text. Edit `main.go`, rebuild the binary, run
-`/reload`, and try again. Use `reasonix plugin doctor starter-extension` when
-the manifest or binary fails validation.
+The model receives the text with the marker appended; the user bubble keeps
+your original input. A live model's reply is not an exact trace of its input.
+Use the host check below to verify the text that reaches the provider.
+
+Edit `main.go`, rebuild the binary, run `/reload`, and try again. Use
+`reasonix plugin doctor starter-extension` when the manifest or binary fails
+validation.
+
+To end the demo, disable or remove it and start a new session or reload while
+idle:
+
+```sh
+reasonix plugin disable starter-extension
+reasonix plugin remove starter-extension --yes
+```
+
+Removing a linked installation leaves this source directory in place.
+
+## Run the host check
+
+From the repository root:
+
+```sh
+go test ./internal/assembly/boot/ -run '^TestEffectStarterExtensionComposedInput$' -count=1
+```
+
+The check builds this actual SDK example without fetching modules, previews
+and applies a copy installation in an isolated home, then removes the source.
+
+It submits turns through the controller with a response-language preference
+and asserts the composed context, original input, and marker at a recording
+provider.
+
+It covers absent, installed, disabled, reenabled, and removed states and waits
+for each started sidecar to exit. It does not test a live model's reply or
+Studio's rendering.
 
 ## Next steps
 
