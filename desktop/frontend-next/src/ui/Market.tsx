@@ -121,16 +121,42 @@ export function Market({ port, onInstalled, onViewInstalled, onSignIn }: Props) 
           aria-label={t("搜索社区市场")}
           onChange={(e) => setQ(e.target.value)}
         />
-        <div className="seg" data-text role="radiogroup" aria-label={t("类型")}>
+        <div className="seg" data-text role="radiogroup" aria-label={t("类型")} data-action-keydown="market.kind"
+          onKeyDown={(e) => {
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+            const radios = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+            const index = radios.indexOf(document.activeElement as HTMLButtonElement);
+            if (index < 0) return;
+            const next = e.key === "ArrowRight" || e.key === "ArrowDown" ? (index + 1) % radios.length
+              : e.key === "ArrowLeft" || e.key === "ArrowUp" ? (index + radios.length - 1) % radios.length : undefined;
+            if (next === undefined) return;
+            e.preventDefault();
+            e.stopPropagation();
+            radios[next].focus();
+            radios[next].click();
+          }}>
           {KINDS.map(([id, name]) => (
-            <button key={id || "all"} role="radio" aria-checked={kind === id} data-action="market.kind" data-value={id || "all"} onClick={() => setKind(id)}>
+            <button key={id || "all"} role="radio" aria-checked={kind === id} tabIndex={kind === id ? 0 : -1} data-action="market.kind" data-value={id || "all"} onClick={() => setKind(id)}>
               {t(name)}
             </button>
           ))}
         </div>
-        <div className="seg" data-text role="radiogroup" aria-label={t("排序")}>
+        <div className="seg" data-text role="radiogroup" aria-label={t("排序")} data-action-keydown="market.sort"
+          onKeyDown={(e) => {
+            if (e.altKey || e.ctrlKey || e.metaKey) return;
+            const radios = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+            const index = radios.indexOf(document.activeElement as HTMLButtonElement);
+            if (index < 0) return;
+            const next = e.key === "ArrowRight" || e.key === "ArrowDown" ? (index + 1) % radios.length
+              : e.key === "ArrowLeft" || e.key === "ArrowUp" ? (index + radios.length - 1) % radios.length : undefined;
+            if (next === undefined) return;
+            e.preventDefault();
+            e.stopPropagation();
+            radios[next].focus();
+            radios[next].click();
+          }}>
           {SORTS.map(([id, name]) => (
-            <button key={id} role="radio" aria-checked={sort === id} data-action="market.sort" data-value={id} onClick={() => setSort(id)}>
+            <button key={id} role="radio" aria-checked={sort === id} tabIndex={sort === id ? 0 : -1} data-action="market.sort" data-value={id} onClick={() => setSort(id)}>
               {t(name)}
             </button>
           ))}
