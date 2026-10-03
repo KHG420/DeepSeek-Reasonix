@@ -680,10 +680,7 @@ func New(prov provider.Provider, tools *tool.Registry, session *sessionstore.Ses
 			path:         strings.TrimSpace(opts.SessionPath),
 			win:          windowState{cacheState: CacheStateUnknown},
 		},
-		task: taskRuntime{
-			ledger: evidence.NewLedger(),
-			budget: runBudget{limit: normalizeTaskBudget(opts.TaskBudget)},
-		},
+		task: newTaskRuntime(opts.TaskBudget),
 		role: agentRole{
 			requireVisibleFinal: opts.RequireVisibleFinal,
 			readOnlyExecution:   opts.ReadOnlyExecution,
@@ -794,7 +791,7 @@ func (a *Agent) reserveParentWrite(runTool tool.Tool, args json.RawMessage, read
 	if !parentWriteGuardTarget(name) {
 		return noop, nil
 	}
-	claim, err := parentWriteReservation(a.writeWorkspaceRoot, name, args)
+	claim, err := a.parentToolWriteReservation(runTool, args)
 	if err != nil {
 		return noop, err
 	}

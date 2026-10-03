@@ -42,7 +42,7 @@ func walkReference(ctx context.Context, root string, limit int) workspaceScan {
 			complete = false
 			return nil
 		}
-		state[path] = pathState{exists: true, size: info.Size(), modTime: info.ModTime().UnixNano()}
+		state[path] = pathState{exists: true, size: info.Size(), modTime: info.ModTime().UnixNano(), mode: info.Mode()}
 		return nil
 	})
 	if err != nil {

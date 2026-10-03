@@ -148,18 +148,28 @@ func TestRunForegroundTimeout(t *testing.T) {
 	}
 }
 
+// The deadline starts at launch, so it has to outlast interpreter startup for
+// the child to print before it fires. A PowerShell cold start on a loaded
+// Windows runner takes seconds; a POSIX shell takes milliseconds.
+const (
+	posixShellOutputDeadline = 500 * time.Millisecond
+	powerShellOutputDeadline = 10 * time.Second
+)
+
 // A run that printed before the deadline is a different situation from one that
 // printed nothing, and the output alone cannot distinguish them.
 func TestRunForegroundTimeoutKeepsQuietWhenOutputExists(t *testing.T) {
-	cmd := "printf started; sleep 5"
+	cmd := "printf started; sleep 60"
 	sh := sandbox.ResolveShell("auto", "", nil)
+	deadline := posixShellOutputDeadline
 	if sh.Kind == sandbox.ShellPowerShell {
-		cmd = "Write-Output started; Start-Sleep -Seconds 5"
+		cmd = "Write-Output started; Start-Sleep -Seconds 60"
+		deadline = powerShellOutputDeadline
 	}
 	argv, _ := shellArgv(t, cmd)
 	res := RunForeground(context.Background(), Request{
 		Argv:      argv,
-		Timeout:   500 * time.Millisecond,
+		Timeout:   deadline,
 		ShellKind: sh.Kind.String(),
 		ShellPath: sh.Path,
 		Track:     true,

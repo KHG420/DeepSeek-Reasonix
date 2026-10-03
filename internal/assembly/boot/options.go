@@ -36,6 +36,10 @@ type Options struct {
 	MaxStepsKey string
 	RequireKey  bool
 	Sink        event.Sink
+	// OpenOnFallbackModel lets an unnamed build pass over a default_model nothing
+	// configured serves. Only a window sets it: it must open to be fixed, while a
+	// headless run must not move to another provider and its billing unasked.
+	OpenOnFallbackModel bool
 	// EffortOverride is a session-local reasoning effort override. Nil means use
 	// the resolved provider config; a non-nil empty string means provider default.
 	EffortOverride *string
@@ -50,6 +54,8 @@ type Options struct {
 	// Interactive terminals must pass a private writer (or io.Discard) so
 	// background output cannot corrupt the TUI's raw mode.
 	Stderr io.Writer
+	// OnPhase receives completed assembly timings synchronously, including on a later failure.
+	OnPhase func(Phase)
 	// Project root for config, skills, memory, commands, hooks, and tool
 	// confinement; empty means the process cwd. Per-tab roots are what let
 	// concurrent sessions load different projects without a chdir.
