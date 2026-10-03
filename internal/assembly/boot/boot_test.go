@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reasonix/internal/base/testenv"
 	"reasonix/internal/state/sessionstore"
 	"reflect"
 	"runtime"
@@ -3279,11 +3280,16 @@ func TestRememberPermissionRuleRejectsAnUnreadableRecordWithoutWriting(t *testin
 	}
 }
 
+// Every writer queues on one lock with a 5s wait, so N writers on a slow
+// filesystem need N critical sections to fit inside it. Eight is enough to
+// interleave on any machine without making the queue the thing under test.
+const rememberContendingWriters = 8
+
 func TestRememberPermissionRuleSerializesConcurrentWriters(t *testing.T) {
 	rememberHome(t)
 	workspace := robustTempDir(t)
 
-	const writers = 32
+	const writers = rememberContendingWriters
 	start := make(chan struct{})
 	results := make(chan control.RememberResult, writers)
 	var wg sync.WaitGroup
@@ -3350,7 +3356,7 @@ func TestRememberPermissionRuleSerializesCrossProcessWriters(t *testing.T) {
 		}
 	})
 
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(testenv.Budget(t))
 	for worker := 0; worker < workers; {
 		if _, err := os.Stat(filepath.Join(readyDir, fmt.Sprintf("ready-%d", worker))); err == nil {
 			worker++
@@ -3401,7 +3407,7 @@ func TestRememberPermissionRuleProcessHelper(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(readyDir, fmt.Sprintf("ready-%d", worker)), []byte("ready"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(testenv.Budget(t))
 	for {
 		if _, err := os.Stat(startPath); err == nil {
 			break
