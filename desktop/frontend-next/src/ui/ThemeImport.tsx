@@ -18,6 +18,7 @@ const ACCEPT = ".zip,.json,.webp,.png,.jpg,.jpeg";
  *  so authoring one never starts with guessing a directory. */
 export function ThemeImport({ port, empty, onImported, onUse }: Props) {
   const file = useRef<HTMLInputElement>(null);
+  const folderRequest = useRef(0);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState("");
   const [landed, setLanded] = useState("");
@@ -29,6 +30,7 @@ export function ThemeImport({ port, empty, onImported, onUse }: Props) {
     setFailed("");
     setNote("");
     setLanded("");
+    folderRequest.current++;
     try {
       const got = await port.importTheme(files);
       onImported();
@@ -43,12 +45,18 @@ export function ThemeImport({ port, empty, onImported, onUse }: Props) {
   };
 
   const reveal = () => {
+    if (busy) return;
+    const request = ++folderRequest.current;
     setFailed("");
     setLanded("");
     port
       .openThemeFolder()
-      .then((dir) => setNote(t("主题目录：{path}", { path: dir })))
-      .catch((e) => setFailed(reason(e)));
+      .then((dir) => {
+        if (folderRequest.current === request) setNote(t("主题目录：{path}", { path: dir }));
+      })
+      .catch((e) => {
+        if (folderRequest.current === request) setFailed(reason(e));
+      });
   };
 
   return (
@@ -74,7 +82,7 @@ export function ThemeImport({ port, empty, onImported, onUse }: Props) {
         {t(busy ? "正在导入…" : "导入主题…")}
       </button>
       <div className="themeacts">
-        <p className="note">
+        <p className="note" role="status" aria-atomic="true">
           {note || t(empty ? "尚未安装主题。选择一个 .zip，或同时选中主题文件夹里的 theme.json 和图片。" : "选择一个 .zip，或同时选中主题文件夹里的 theme.json 和图片。")}
         </p>
         {landed && (
@@ -89,7 +97,7 @@ export function ThemeImport({ port, empty, onImported, onUse }: Props) {
             {t("立即使用")}
           </button>
         )}
-        <button className="btn sm" data-action="theme.folder" onClick={reveal}>
+        <button className="btn sm" data-action="theme.folder" disabled={busy} onClick={reveal}>
           {t("打开主题目录")}
         </button>
       </div>
