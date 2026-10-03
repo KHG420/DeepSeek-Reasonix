@@ -25,6 +25,7 @@ type pathState struct {
 	exists  bool
 	size    int64
 	modTime int64
+	mode    os.FileMode
 }
 
 // pathSnapshot is what the workspace looked like before a call. root is kept so
@@ -94,7 +95,7 @@ func statePathOf(path string) pathState {
 	if err != nil {
 		return pathState{}
 	}
-	return pathState{exists: true, size: info.Size(), modTime: info.ModTime().UnixNano()}
+	return pathState{exists: true, size: info.Size(), modTime: info.ModTime().UnixNano(), mode: info.Mode()}
 }
 
 // since compares the snapshot against the workspace as it is now, returning

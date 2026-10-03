@@ -62,6 +62,12 @@ type Previewer interface {
 	Preview(ctx context.Context, args json.RawMessage) (diff.Change, error)
 }
 
+// WritePathResolver owns writer path resolution. Any error requires a whole
+// workspace lease; ErrAmbiguousPath may also carry resolved targets for grants.
+type WritePathResolver interface {
+	WritePaths(json.RawMessage) ([]string, error)
+}
+
 // PreviewChange returns the change a writer tool would make for args, or ok=false
 // when there's nothing renderable: t is read-only, doesn't implement Previewer,
 // the preview errored (the edit will likely fail too), or the file is binary.

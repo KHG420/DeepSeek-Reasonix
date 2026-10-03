@@ -27,6 +27,9 @@ OpenAPI inputs, a reference checker, and a source-linked guide format.
 The [stdio MCP example](../examples/mcp-line-counter-kit/README.md) bundles a
 local Go server with build, connection, tool-call, and lifecycle checks.
 
+The [Studio theme author guide](THEME_AUTHOR_GUIDE.md) uses a copyable pure-theme
+package, the current token vocabulary, and Appearance activation and cleanup.
+
 ## CLI Mode
 
 Use `reasonix plugin` when installing or managing plugin packages from a

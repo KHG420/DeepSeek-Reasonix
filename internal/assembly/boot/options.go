@@ -54,6 +54,8 @@ type Options struct {
 	// Interactive terminals must pass a private writer (or io.Discard) so
 	// background output cannot corrupt the TUI's raw mode.
 	Stderr io.Writer
+	// OnPhase receives completed assembly timings synchronously, including on a later failure.
+	OnPhase func(Phase)
 	// Project root for config, skills, memory, commands, hooks, and tool
 	// confinement; empty means the process cwd. Per-tab roots are what let
 	// concurrent sessions load different projects without a chdir.

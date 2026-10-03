@@ -85,6 +85,10 @@ it.each([
   expect(field("来源地址").value).toBe("");
   expect(document.activeElement).toBe(field("来源地址"));
   expect(screen.getByRole<HTMLInputElement>("checkbox").checked).toBe(status === "private");
+  expect(screen.getByText(t("从 {slug} 复用发布资料；请填写本次发布的来源地址。", { slug: f.pkg.slug }))).toBeTruthy();
+  expect(screen.getByText(t(status === "private"
+    ? "以 @{handle} 的名义保存，仅自己可见，不提交审核。只收来源地址，不上传文件。"
+    : "以 @{handle} 的名义提交，审核通过后公开。只收来源地址，不上传文件。", { handle: "demo" }))).toBeTruthy();
   const names = { skill: "技能", plugin: "插件", mcp: "MCP 服务", theme: "主题" };
   expect(screen.getByRole("radio", { name: t(names[kind]) }).getAttribute("aria-checked")).toBe("true");
   expect(screen.getByRole<HTMLButtonElement>("button", { name: t(status === "private" ? "保存为私有" : "提交审核") }).disabled).toBe(true);
@@ -196,7 +200,7 @@ it.each(["success", "failure"])("reads the replacement account's release list wh
   expect(screen.queryByText("old list unavailable")).toBeNull();
   await openDraft(screen.getByText("other-kit").closest("li")!);
   expect(field("名称").value).toBe("other-kit");
-  expect(screen.getByText(/以 @other 的名义提交/)).toBeTruthy();
+  expect(screen.getByText(t("以 @{handle} 的名义保存，仅自己可见，不提交审核。只收来源地址，不上传文件。", { handle: "other" }))).toBeTruthy();
 });
 
 it.each(["zh", "en"])("keeps prefilled comma-containing tags when adding a tag in %s", async (lang) => {

@@ -26,7 +26,7 @@ const ExportSizeLimit = 64 << 20
 // hand to a stranger.
 var exportSkipDirs = map[string]bool{".git": true, ".hg": true, ".svn": true}
 
-var envVarRef = regexp.MustCompile(`^\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?$`)
+var envVarRef = regexp.MustCompile(`^\$\{([A-Za-z_][A-Za-z0-9_]*)\}$`)
 
 // Export packs the package rooted at root into a zip whose entries hang off a
 // single <name>/ directory, and reports the environment variables whoever

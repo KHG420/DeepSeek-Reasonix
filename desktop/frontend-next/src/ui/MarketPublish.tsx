@@ -84,7 +84,7 @@ function PublishDraft({ port, handle, onMine, initial }: PublishProps) {
   if (done) {
     return (
       <div className="mkt mkt-pub" data-stage="done">
-        <div className="find" data-lvl="ok">
+        <div className="find" data-lvl="ok" role="status">
           {done.package.status === "private" ? (
             <>
               <span className="t">{t("已保存 {slug} {version}，仅自己可见", { slug: done.package.slug, version: done.version })}</span>
@@ -111,12 +111,17 @@ function PublishDraft({ port, handle, onMine, initial }: PublishProps) {
 
   const ready = d.name.trim() !== "" && d.source.trim() !== "" && !busy;
   return (
-    <div className="mkt mkt-pub" aria-busy={busy}>
+    <form className="mkt mkt-pub" aria-busy={busy} data-action-submit="market.publish" data-action-keydown="market.publish"
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !event.nativeEvent.isComposing && event.target instanceof HTMLInputElement && event.target.dataset.value !== "name" && event.target.dataset.value !== "source") event.preventDefault();
+      }} onSubmit={(event) => { event.preventDefault(); if (ready) void submit(); }}>
       {d.origin && <p className="mkt-sum">{t("从 {slug} 复用发布资料；请填写本次发布的来源地址。", { slug: d.origin })}</p>}
-      <p className="mkt-sum">{t("以 @{handle} 的名义提交，审核通过后公开。只收来源地址，不上传文件。", { handle })}</p>
+      <p className="mkt-sum">{t(d.private
+        ? "以 @{handle} 的名义保存，仅自己可见，不提交审核。只收来源地址，不上传文件。"
+        : "以 @{handle} 的名义提交，审核通过后公开。只收来源地址，不上传文件。", { handle })}</p>
       <div className="seg" data-text role="radiogroup" aria-label={t("类型")}>
         {KINDS.map(([id, name]) => (
-          <button key={id} role="radio" aria-checked={d.kind === id} disabled={busy} data-action="market.draft" data-value="kind" onClick={() => setD({ ...d, kind: id })}>
+          <button key={id} type="button" role="radio" aria-checked={d.kind === id} disabled={busy} data-action="market.draft" data-value="kind" onClick={() => setD({ ...d, kind: id })}>
             {t(name)}
           </button>
         ))}
@@ -165,7 +170,7 @@ function PublishDraft({ port, handle, onMine, initial }: PublishProps) {
         {t("仅自己可见：不提交审核，社区市场里只有你的账号能看到并安装")}
       </label>
       {error && (
-        <div className="find" data-lvl="err">
+        <div className="find" data-lvl="err" role="alert">
           <span className="t">{t("没有提交成功")}</span>
           <span className="why">{error}</span>
         </div>
@@ -176,11 +181,11 @@ function PublishDraft({ port, handle, onMine, initial }: PublishProps) {
             ? t("保存后只有你能看到；要公开时在「我的发布」里提交审核。")
             : t("提交后进入审核队列；审核员会固定审核时的内容，之后只安装那一份。")}
         </span>
-        <button className="act" data-action="market.publish" data-primary disabled={!ready} onClick={() => void submit()}>
+        <button type="submit" className="act" data-action="market.publish" data-primary disabled={!ready}>
           {t(busy ? "提交中…" : d.private ? "保存为私有" : "提交审核")}
         </button>
       </div>
-    </div>
+    </form>
   );
 }
 
@@ -283,7 +288,7 @@ function PackageList({ port, onInstalled, onViewInstalled, onApplying, onPublish
                 {onPublish && <button className="act" data-action="market.prepare-version" data-value={p.slug} disabled={sending === p.slug} onClick={() => onPublish(p)}>{t("发布新版本")}</button>}
                 {stuck && <span className="note">{t("技能不会被原地覆盖：先在「已安装」里移除旧版本，再回来安装")}</span>}
                 {p.status === "private" && (
-                  <button className="act" data-action="market.submit" data-value={p.slug} disabled={sending === p.slug} onClick={() => void submit(p.slug)}>
+                  <button className="act" data-action="market.submit" data-value={p.slug} disabled={!!sending} onClick={() => void submit(p.slug)}>
                     {t(sending === p.slug ? "提交中…" : "提交审核")}
                   </button>
                 )}
@@ -293,7 +298,7 @@ function PackageList({ port, onInstalled, onViewInstalled, onApplying, onPublish
                   </button>
                 )}
               </span>
-              {sendError?.[0] === p.slug && <span className="why">{sendError[1]}</span>}
+              {sendError?.[0] === p.slug && <span className="why" role="alert">{sendError[1]}</span>}
             </li>
           );
         })}

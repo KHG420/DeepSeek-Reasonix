@@ -539,20 +539,6 @@ func (a *Agent) prepareToolExecution(ctx context.Context, plan *toolCallPlan) (t
 	if outcome, blocked := a.assertPlanPhaseAdmitted(plan); blocked {
 		return outcome, true
 	}
-	// Acquire after permission is granted but before PreToolUse: hooks are user
-	// shell code and can themselves change the workspace. This keeps readers
-	// concurrent and avoids holding the workspace during an approval prompt while
-	// still covering every write-side action that follows authorization.
-	// Lazy workspace lease on the first real writer for every role setting.
-	if plan.mutates && a.svc.workspaceLease != nil {
-		if err := a.svc.workspaceLease.AcquireWrite(ctx); err != nil {
-			return toolOutcome{
-				output:  fmt.Sprintf("blocked: the workspace did not become available for writing: %v", err),
-				blocked: true,
-				errMsg:  "blocked: workspace write lease unavailable",
-			}, true
-		}
-	}
 	// Resolve the concrete execution target before hooks. A proxy may carry a
 	// different target/name/argument set than the provider-visible call.
 	plan.runTool = plan.execTool
@@ -562,6 +548,19 @@ func (a *Agent) prepareToolExecution(ctx context.Context, plan *toolCallPlan) (t
 		plan.runArgs = plan.resolved.Args
 		if len(plan.runArgs) == 0 {
 			plan.runArgs = json.RawMessage(`{}`)
+		}
+	}
+	// Hooks can write beyond a tool's paths, so permission precedes lease
+	// acquisition and hooks follow it under a conservative workspace claim.
+	if plan.mutates && a.svc.workspaceLease != nil {
+		if err := a.svc.workspaceLease.AcquirePaths(ctx, a.workspaceWritePaths(plan)); err != nil {
+			return toolOutcome{
+				output:         fmt.Sprintf("blocked: %v", err),
+				blocked:        true,
+				errMsg:         "blocked: workspace write lease unavailable",
+				refusalCode:    workspaceLeaseRefusalCode(err),
+				workspaceLease: workspaceLeaseConflictScope(err),
+			}, true
 		}
 	}
 	// Hold the parent claim before PreToolUse: hooks are user shell code and may

@@ -149,7 +149,7 @@ func NameFromArgv(command string, args []string) string {
 	runner := strings.TrimSuffix(strings.TrimSuffix(strings.TrimSuffix(strings.ToLower(filepath.Base(command)), ".exe"), ".cmd"), ".bat")
 	candidate := command
 	switch runner {
-	case "npx", "bunx", "uvx":
+	case "npx", "bunx":
 		if operand := firstCommandOperand(args); operand != "" {
 			candidate = operand
 		}
@@ -161,11 +161,9 @@ func NameFromArgv(command string, args []string) string {
 		if operand := nodeCommandOperand(args); operand != "" {
 			candidate = operand
 		}
-	case "uv":
-		if len(args) > 0 && args[0] == "run" {
-			if operand := firstCommandOperand(args[1:]); operand != "" {
-				candidate = operand
-			}
+	case "uv", "uvx":
+		if operand := uvCommandOperand(args, runner == "uv"); operand != "" {
+			candidate = operand
 		}
 	}
 	base := filepath.Base(candidate)
@@ -251,7 +249,8 @@ func nodeCommandOperand(args []string) string {
 		case arg == "-", arg == "-e", arg == "--eval", arg == "-p", arg == "--print",
 			strings.HasPrefix(arg, "--eval="), strings.HasPrefix(arg, "--print="):
 			return ""
-		case arg == "-r", arg == "--require", arg == "--import":
+		case arg == "-r", arg == "--require", arg == "--import", arg == "--env-file",
+			arg == "--env-file-if-exists", arg == "--conditions", arg == "-C":
 			i++
 		case arg != "" && !strings.HasPrefix(arg, "-"):
 			return arg
@@ -288,7 +287,19 @@ func Tokenize(s string) []string {
 	var cur strings.Builder
 	inWord := false
 	var quote rune
-	for _, r := range s {
+	chars := []rune(s)
+	for i := 0; i < len(chars); i++ {
+		r := chars[i]
+		if r == '\\' && quote != '\'' && i+1 < len(chars) && chars[i+1] == '\n' {
+			start := i
+			for start > 0 && chars[start-1] == '\\' {
+				start--
+			}
+			if (i-start)%2 == 0 {
+				i++
+				continue
+			}
+		}
 		switch {
 		case quote != 0:
 			if r == quote {
