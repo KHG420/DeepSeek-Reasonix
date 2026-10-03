@@ -165,8 +165,17 @@ func NameFromArgv(command string, args []string) string {
 		if operand := uvCommandOperand(args, runner == "uv"); operand != "" {
 			candidate = operand
 		}
+	case "docker":
+		if len(args) > 0 && args[0] == "run" {
+			candidate = dockerRunOperand(args[1:])
+		} else if len(args) > 1 && args[0] == "container" && args[1] == "run" {
+			candidate = dockerRunOperand(args[2:])
+		}
 	}
 	base := filepath.Base(candidate)
+	if runner == "docker" && candidate != command {
+		base, _, _ = strings.Cut(base, ":")
+	}
 	if runner == "uvx" {
 		base, _, _ = strings.Cut(base, "==")
 	}
