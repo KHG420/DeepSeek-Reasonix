@@ -161,6 +161,10 @@ func NameFromArgv(command string, args []string) string {
 		if operand := nodeCommandOperand(args); operand != "" {
 			candidate = operand
 		}
+	case "pnpm":
+		if operand := pnpmDlxOperand(args); operand != "" {
+			candidate = operand
+		}
 	case "uv", "uvx":
 		if operand := uvCommandOperand(args, runner == "uv"); operand != "" {
 			candidate = operand
@@ -187,6 +191,36 @@ func NameFromArgv(command string, args []string) string {
 		}
 	}
 	return name
+}
+
+func pnpmDlxOperand(args []string) string {
+	valueFlags := map[string]bool{"--package": true, "--allow-build": true, "--reporter": true}
+	dlx, options := false, true
+	for i := 0; i < len(args); i++ {
+		arg := strings.TrimSpace(args[i])
+		if options && arg == "--" {
+			options = false
+			continue
+		}
+		if options && strings.HasPrefix(arg, "-") {
+			if valueFlags[arg] {
+				i++
+			}
+			continue
+		}
+		if arg == "" {
+			continue
+		}
+		if !dlx {
+			if arg != "dlx" {
+				return ""
+			}
+			dlx = true
+			continue
+		}
+		return arg
+	}
+	return ""
 }
 
 func pythonCommandOperand(args []string) string {
