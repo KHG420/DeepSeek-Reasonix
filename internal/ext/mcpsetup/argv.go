@@ -161,6 +161,10 @@ func NameFromArgv(command string, args []string) string {
 		if operand := nodeCommandOperand(args); operand != "" {
 			candidate = operand
 		}
+	case "npm":
+		if operand := npmExecOperand(args); operand != "" {
+			candidate = operand
+		}
 	case "uv", "uvx":
 		if operand := uvCommandOperand(args, runner == "uv"); operand != "" {
 			candidate = operand
@@ -187,6 +191,39 @@ func NameFromArgv(command string, args []string) string {
 		}
 	}
 	return name
+}
+
+func npmExecOperand(args []string) string {
+	exec, options := false, true
+	for i := 0; i < len(args); i++ {
+		arg := strings.TrimSpace(args[i])
+		if options && arg == "--" {
+			options = false
+			continue
+		}
+		if options && strings.HasPrefix(arg, "-") {
+			if strings.HasPrefix(arg, "-c") || arg == "--call" || strings.HasPrefix(arg, "--call=") {
+				return ""
+			}
+			switch arg {
+			case "--package", "--workspace", "-w":
+				i++
+			}
+			continue
+		}
+		if arg == "" {
+			continue
+		}
+		if !exec {
+			if arg != "exec" && arg != "x" {
+				return ""
+			}
+			exec = true
+			continue
+		}
+		return arg
+	}
+	return ""
 }
 
 func pythonCommandOperand(args []string) string {
