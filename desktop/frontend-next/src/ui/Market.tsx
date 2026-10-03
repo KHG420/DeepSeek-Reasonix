@@ -375,9 +375,21 @@ export function MarketGroup({ port, onInstalled, onViewInstalled, account, onSig
     <Group id="market" title={t("社区市场")}
       hint={t("社区发布、经过审核的技能、插件、MCP 服务与主题。固定了审核内容的版本按审核时的内容安装，未固定的需要你信任发布者；安装前都会列出将写入的全部内容，与粘贴地址安装走同一套确认。")}>
       {handle ? (
-        <div className="seg mkt-views" data-text role="radiogroup" aria-label={t("社区市场")}>
+        <div className="seg mkt-views" data-text role="radiogroup" aria-label={t("社区市场")} data-action-keydown="market.view"
+          onKeyDown={(e) => {
+            if (applying || e.altKey || e.ctrlKey || e.metaKey) return;
+            const radios = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')];
+            const index = radios.indexOf(document.activeElement as HTMLButtonElement);
+            if (index < 0) return;
+            const next = e.key === "ArrowRight" || e.key === "ArrowDown" ? (index + 1) % radios.length
+              : e.key === "ArrowLeft" || e.key === "ArrowUp" ? (index + radios.length - 1) % radios.length : -1;
+            if (next < 0) return;
+            e.preventDefault();
+            radios[next]!.focus();
+            radios[next]!.click();
+          }}>
           {VIEWS.map(([id, name]) => (
-            <button key={id} role="radio" aria-checked={at === id} disabled={applying} data-action="market.view" data-value={id} onClick={() => { if (id === "publish" && at !== "publish") setDraft(null); setView(id); }}>
+            <button key={id} role="radio" aria-checked={at === id} tabIndex={at === id ? 0 : -1} disabled={applying} data-action="market.view" data-value={id} onClick={() => { if (id === "publish" && at !== "publish") setDraft(null); setView(id); }}>
               {t(name)}
             </button>
           ))}
