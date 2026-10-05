@@ -795,6 +795,7 @@ export const EN_SETTINGS: Record<string, string> = {
   "排序": "Sort",
   "搜索技能、插件、MCP 服务与主题": "Search skills, plugins, MCP servers and themes",
   "搜索社区市场": "Search the community market",
+  "搜索我的发布": "Search my packages",
   "无法读取社区市场": "Could not read the community market",
   "没有找到匹配的包。": "No matching packages.",
   "没有找到已固定内容的包。可关闭筛选查看全部包。": "No pinned packages found. Turn off the filter to see all packages.",
