@@ -1,0 +1,7 @@
+.appearance-advanced > summary { cursor: pointer; list-style: none; }
+.appearance-advanced > summary::-webkit-details-marker { display: none; }
+.appearance-advanced > summary > .hint { display: block; }
+.appearance-advanced > summary:focus-visible { outline: 2px solid var(--focus); }
+.appearance-advanced > summary > .grp-hd { margin: 0; font: var(--w-semi) var(--fs-lead)/1.35 var(--ui); color: var(--text); letter-spacing: -.005em; }
+.appearance-advanced > summary > .grp-hd::after { content: ""; margin-left: auto; flex: none; width: 10px; height: 10px; color: var(--ghost); background: currentColor; transform: rotate(90deg); -webkit-mask: var(--chev) center / contain no-repeat; mask: var(--chev) center / contain no-repeat; transition: transform var(--m-line); }
+.appearance-advanced[open] > summary > .grp-hd::after { transform: rotate(270deg); }

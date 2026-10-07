@@ -1,3 +1,4 @@
+import "../styles/appearance-advanced.css";
 import { ApplyNote } from "./Group";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties } from "react";
 import { effectsMode, onEffectsChange, setEffectsMode, type EffectsMode } from "../state/prefs";
@@ -540,12 +541,10 @@ export function Appearance({ port, theme, onTheme, contrast, onContrast, weight,
           once, not that any one control is obscure. The summary says what is
           folded and whether it has been changed — a disclosure hiding a value
           somebody set is a screen disagreeing with the window itself. */}
-      <details className="advset">
-        <summary>
-          <span className="tx">
-            <span className="lb">{t("高级外观")}</span>
-            <span className="ds">{changed.length ? t("已修改：{list}", { list: changed.join(" · ") }) : t("字体、文字粗细、文字对比度、视觉效果")}</span>
-          </span>
+      <details className="appearance-advanced">
+        <summary className="grp">
+          <span className="grp-hd"><span>{t("高级外观")}</span></span>
+          <span className="hint">{changed.length ? t("已修改：{list}", { list: changed.join(" · ") }) : t("字体、文字粗细、文字对比度、视觉效果")}</span>
         </summary>
         <section className="grp" id="set-font" data-setting="font">
           <div className="grp-hd">
