@@ -1,6 +1,7 @@
 // The turn starts here: drafting, attachments, run posture, and the two actions
 // that remain available while an agent is live.
 export const EN_COMPOSER: Record<string, string> = {
+  "当前所选": "Current",
   "↓ 回到最新": "↓ Back to latest",
   "不思考": "No reasoning",
   "最轻量": "Minimal",

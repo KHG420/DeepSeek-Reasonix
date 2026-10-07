@@ -33,7 +33,7 @@ function mount(models: ModelEntry[], current?: string, onPick = vi.fn()) {
       label="model"
       place="bottom"
       current={current}
-      items={modelMenu(models)}
+      items={modelMenu(models, [], current)}
       searchAlways
       searchPlaceholder="Search models"
       menuClassName="studio-model-menu"
@@ -82,6 +82,18 @@ describe("model picker", () => {
     const on = rows().filter((r) => r.hasAttribute("data-on"));
     expect(on).toHaveLength(1);
     expect(on[0].dataset.value).toBe("relay/m2");
+  });
+
+  it("heads the pinned model with Current and preserves search and keyboard selection", () => {
+    const onPick = mount(fleet(2), "relay/m1");
+    expect(heads()).toEqual(["Current", "deepseek", "moonshot", "relay", "gw"]);
+    expect(rows()[0].dataset.value).toBe("relay/m1");
+    expect(rows()).toHaveLength(8);
+    const field = screen.getByPlaceholderText("Search models");
+    fireEvent.change(field, { target: { value: "moonshot" } });
+    expect(heads()).toEqual(["moonshot"]);
+    fireEvent.keyDown(field, { key: "Enter" });
+    expect(onPick).toHaveBeenCalledWith("moonshot/m0");
   });
 
   it("scrolls the current model into view on open", () => {

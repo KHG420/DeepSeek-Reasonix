@@ -665,7 +665,7 @@ export function Composer({ port, status, running, quote, restore, focus, onSubmi
             place="bottom"
             title={status?.modelRef ?? modelLb}
             current={status?.modelRef}
-            items={modelMenu(models, providerOrder)}
+            items={modelMenu(models, providerOrder, status?.modelRef)}
             menuClassName="studio-model-menu"
             searchAlways
             searchPlaceholder={t("搜索模型或服务商…")}
