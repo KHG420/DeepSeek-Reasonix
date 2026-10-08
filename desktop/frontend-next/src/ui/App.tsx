@@ -164,7 +164,7 @@ export function App({ hub }: { hub: HubPort }) {
       hub
         .tree()
         .then(setTree)
-        .catch(() => setTree([]))
+        .catch(() => {})
         .finally(() => setTreeRead(true)),
     [hub],
   );
