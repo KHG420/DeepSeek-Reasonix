@@ -24,7 +24,7 @@ func (a *Agent) applyCallContract(plan *toolCallPlan) (toolOutcome, bool) {
 		return toolOutcome{}, false
 	}
 	msg := fmt.Sprintf("invalid arguments for %s%s", plan.permName, contract.Hint())
-	return toolOutcome{output: "error: " + msg, errMsg: msg}, true
+	return toolOutcome{output: "error: " + msg, errMsg: msg, refusalCode: "tool.arguments_invalid"}, true
 }
 
 // malformedArgumentsDetail says why the arguments did not parse. A call that

@@ -2,7 +2,7 @@ import type { Item } from "../../state/session";
 import { seconds } from "../../i18n/format";
 import { shortArgs } from "../args";
 import { t } from "../../i18n";
-import { toolFailed } from "../cards/outcome";
+import { delegationFailureLabel, toolFailed } from "../cards/outcome";
 
 import { agentsIn } from "./derive";
 import { Grp, Row } from "./kit";
@@ -42,7 +42,7 @@ export function Agents({ tasks, onOpen }: { tasks: Task[]; onOpen?: (taskId: str
               {(x.tool.profile?.count ?? 1) > 1 && <b className="mult">×{x.tool.profile?.count}</b>}
             </span>
             <span className="rt">
-              {x.running ? t("运行中") : toolFailed(x.tool) ? t("已中断") : x.tool.durationMs ? seconds(x.tool.durationMs, 0) : t("已交付")}
+              {x.running ? t("运行中") : toolFailed(x.tool) ? delegationFailureLabel(x.tool) : x.tool.durationMs ? seconds(x.tool.durationMs, 0) : t("已交付")}
             </span>
             {onOpen && (
               <button

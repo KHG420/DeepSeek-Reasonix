@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import "./testkit";
@@ -9,6 +9,10 @@ import { AgentTranscript } from "./panels/AgentTranscript";
 import { NestedCall } from "./cards/ToolCard";
 import type { Task } from "./panels/Agents";
 import type { Tool } from "../port/wire";
+import { initialState, reduce, type SessionEvent } from "../state/session";
+import { railOf } from "./panels/derive";
+import { ToolCard } from "./cards/ToolCard";
+import { boot, STORAGE } from "../i18n";
 
 afterEach(cleanup);
 
@@ -94,4 +98,43 @@ it("counts only running delegates, reaching 0 when the last one finishes", () =>
   expect(n([task("a", true, "A"), task("b", false, "B")])).toBe("1");
   cleanup();
   expect(n([task("a", false, "A"), task("b", false, "B")])).toBe("0");
+});
+
+it.each(["zh", "en"])("labels a schema-refused explore as not run in the %s rail, transcript and card", async (lang) => {
+  localStorage.setItem(STORAGE, lang);
+  boot();
+  const error = 'invalid arguments for explore; it requires "task"; it accepts "continue_from", "task"';
+  const events: SessionEvent[] = [
+    { kind: "tool_dispatch", tool: { id: "refused", name: "explore", args: "{}", readOnly: true, profile: { name: "explore" } } },
+    { kind: "tool_result", tool: { id: "refused", name: "explore", readOnly: true, err: error, output: `error: ${error}`, refusalCode: "tool.arguments_invalid", durationMs: 0 } },
+  ];
+  const replay: SessionEvent[] = JSON.parse(JSON.stringify(events));
+  const s = replay.reduce(reduce, initialState);
+  const tasks = railOf(s.items, s.executions, s.subagentPhase).tasks;
+  const label = lang === "zh" ? "未执行" : "Not run";
+  try {
+    render(<Host tasks={tasks} />);
+    expect(document.querySelector(".ag .rt")?.textContent).toBe(label);
+    await userEvent.click(screen.getByRole("button", { name: lang === "zh" ? "查看完整记录：explore" : "Open full transcript: explore" }));
+    const dialog = screen.getByRole("dialog", { name: lang === "zh" ? "子代理完整记录：explore" : "Full transcript of subagent: explore" });
+    expect(dialog.querySelector(".rt")?.textContent).toBe(label);
+    expect(within(dialog).getByText(`error: ${error}`)).not.toBeNull();
+    expect(dialog.textContent).not.toContain(lang === "zh" ? "已中断" : "Interrupted");
+    cleanup();
+    render(<ToolCard tool={tasks[0].tool} running={false} />);
+    expect(document.querySelector(".fail")?.textContent).toBe(label);
+    expect(document.body.textContent).toContain(error);
+  } finally {
+    localStorage.setItem(STORAGE, "zh");
+    boot();
+  }
+});
+
+it("keeps a cancelled run interrupted even with no recorded steps or duration", async () => {
+  const stopped = task("stopped", false, "explore");
+  stopped.tool = { ...stopped.tool, durationMs: 0, err: "sub-agent: context canceled", output: "error: sub-agent: context canceled" };
+  render(<Host tasks={[stopped]} />);
+  expect(document.querySelector(".ag .rt")?.textContent).toBe("已中断");
+  await userEvent.click(screen.getByRole("button", { name: "查看完整记录：explore" }));
+  expect(screen.getByRole("dialog", { name: "子代理完整记录：explore" }).querySelector(".rt")?.textContent).toBe("已中断");
 });

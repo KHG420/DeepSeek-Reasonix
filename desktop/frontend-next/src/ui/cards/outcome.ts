@@ -9,11 +9,18 @@ export function toolFailed(tool: Tool): boolean {
   return !!tool.err;
 }
 
+const argumentRefused = (tool: Tool): boolean => tool.refusalCode === "tool.arguments_invalid";
+
+export function delegationFailureLabel(tool: Tool): string {
+  return t(argumentRefused(tool) ? "未执行" : "已中断");
+}
+
 export function toolChangedFile(tool: Tool): boolean {
   return !!tool.diff || tool.added !== undefined || tool.removed !== undefined;
 }
 
 export function toolFailureLabel(tool: Tool): string {
+  if (argumentRefused(tool)) return t("未执行");
   const execution = tool.execution;
   if ((execution?.exitCode ?? 0) !== 0) return `exit ${execution?.exitCode}`;
   if (execution?.state && execution.state !== "completed") return execution.state;
