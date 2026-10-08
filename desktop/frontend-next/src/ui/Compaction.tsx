@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from "react";
+import { SaveNote, saveNote, type SaveOutcome } from "./SaveNote";
 import { t } from "../i18n";
-import { reason } from "../i18n/kernel";
 import type { AgentPort, CompactionSettings } from "../port/port";
 import { foldModeOf, foldModeValue, type FoldMode as Mode } from "./foldbound";
 
@@ -18,7 +18,7 @@ export function Compaction({ port, onChanged }: { port: AgentPort; onChanged: ()
   // been committed, so it could never be committed.
   const [choice, setChoice] = useState<Mode | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [note, setNote] = useState<SaveOutcome | null>(null);
   const field = useId();
 
   useEffect(() => {
@@ -42,7 +42,7 @@ export function Compaction({ port, onChanged }: { port: AgentPort; onChanged: ()
 
   const save = async (value: number) => {
     setBusy(true);
-    setError("");
+    setNote(null);
     try {
       const saved = await port.saveCompaction(value);
       setBox(saved);
@@ -50,8 +50,9 @@ export function Compaction({ port, onChanged }: { port: AgentPort; onChanged: ()
       setChoice(null);
       onChanged();
     } catch (e) {
-      setError(reason(e));
+      setNote(saveNote(e));
     } finally {
+      sent.current = null;
       setBusy(false);
     }
   };
@@ -71,15 +72,15 @@ export function Compaction({ port, onChanged }: { port: AgentPort; onChanged: ()
     if (text === "") return;
     const next = Number(text);
     if (!Number.isFinite(next) || !Number.isInteger(next) || next < 1000 || (!off && next >= win)) {
-      setError(t("阈值需至少为 1,000，并小于模型上下文窗口。"));
+      setNote({ text: t("阈值需至少为 1,000，并小于模型上下文窗口。"), unapplied: false });
       return;
     }
-    setError("");
+    setNote(null);
     send(next);
   };
 
   const pick = (next: Mode) => {
-    setError("");
+    setNote(null);
     setChoice(next);
     const value = foldModeValue[next];
     if (value !== undefined) return send(value);
@@ -204,7 +205,7 @@ export function Compaction({ port, onChanged }: { port: AgentPort; onChanged: ()
             </span>
             <span className="sc">{off ? "—" : tokens(capacity)}</span>
       </div>
-      {error && <p className="note" data-lvl="warn">{error}</p>}
+      <SaveNote note={note} />
     </>
   );
 }

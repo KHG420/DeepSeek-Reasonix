@@ -5,7 +5,7 @@
 // function of the error and the installed catalogue.
 import { beforeEach, describe, expect, it } from "vitest";
 import { boot, STORAGE } from "./index";
-import { ACCOUNT_SIGNIN_DISABLED, PROVIDER_EDIT_DISABLED, SAVED_NOT_APPLIED, codes, reason } from "./kernel";
+import { ACCOUNT_SIGNIN_DISABLED, PROVIDER_EDIT_DISABLED, SAVED_NOT_APPLIED, savedNotApplied, codes, reason } from "./kernel";
 import { DeliveryError, HttpError } from "../port/port";
 
 // Pinned, not defaulted: with nothing stored the window follows the machine, so
@@ -190,4 +190,14 @@ describe("attachment refusals", () => {
   it("degrades an unknown code to the kernel's own words", () => {
     expect(reason(coded("kernel words", "attachment.from_the_future"))).toBe("kernel words");
   });
+});
+
+it("classifies only typed saved-not-applied receipts", () => {
+  for (const code of SAVED_NOT_APPLIED) {
+    expect(savedNotApplied(coded("diagnostic", code))).toBe(true);
+    expect(savedNotApplied({ reason: { code } })).toBe(false);
+  }
+  for (const e of [coded("saved but not applied", "unknown.code"), new HttpError(409, "diagnostic"), new Error("runtime.saved_while_running"), null]) {
+    expect(savedNotApplied(e)).toBe(false);
+  }
 });

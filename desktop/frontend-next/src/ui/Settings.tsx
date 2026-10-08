@@ -1,8 +1,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { SaveNote, saveNote, type SaveOutcome } from "./SaveNote";
 import { t } from "../i18n";
 import { listenAction } from "./listen";
 import { useRuntimeReload } from "./RuntimeReload";
-import { HttpError } from "../port/port";
 import type { AccountState, AgentPort, Appearance as Look, CapabilityScope, McpEntry, ModelEntry, PluginPackage, SessionStatus, SkillEntry } from "../port/port";
 import { arrowTabs } from "./tablist";
 import { bytes, tokens as fmtTokens } from "../i18n/format";
@@ -48,7 +48,7 @@ import { UsageSettings } from "./UsageSettings";
 import { Storage } from "./Storage";
 import { Appearance, SCHEMES } from "./Appearance";
 import { ScopeBar } from "./CapabilityScope";
-import { SAVED_NOT_APPLIED, reason } from "../i18n/kernel";
+import { reason } from "../i18n/kernel";
 import { SettingsHeading } from "./SettingsHeading";
 import { APPROVALS, approvalName, approvalNote } from "./approvals";
 
@@ -117,7 +117,7 @@ export function Settings({ hub, onError, port, networkPort, networkHost, status,
   const [implicit, setImplicit] = useState(true);
   const [live, setLive] = useState(true);
   const [busy, setBusy] = useState("");
-  const [note, setNote] = useState<{ text: string; unapplied: boolean } | null>(null);
+  const [note, setNote] = useState<SaveOutcome | null>(null);
   const setFailed = useCallback((text: string) => setNote(text ? { text, unapplied: false } : null), []);
   const [adding, setAdding] = useState(false);
   const [remoteBook, setRemoteBook] = useState<RemoteHost[] | null>(null);
@@ -235,7 +235,7 @@ export function Settings({ hub, onError, port, networkPort, networkHost, status,
       await fn();
       onChanged();
     } catch (e) {
-      setNote({ text: reason(e), unapplied: e instanceof HttpError && SAVED_NOT_APPLIED.includes(e.reason?.code ?? "") });
+      setNote(saveNote(e));
     } finally {
       setBusy("");
     }
@@ -467,12 +467,7 @@ export function Settings({ hub, onError, port, networkPort, networkHost, status,
               said in one place. Copied onto the pages somebody remembered, it
               was missing from the third that writes it: 创建隔离副本 was
               refused by the kernel and the screen showed nothing at all. */}
-          {note && (
-            <div className="find" data-lvl="warn" role={note.unapplied ? "status" : "alert"}>
-              <span className="t">{t(note.unapplied ? "已保存，尚未生效" : "操作未完成")}</span>
-              <span className="why">{note.text}</span>
-            </div>
-          )}
+          <SaveNote note={note} />
           {at === "session" && (
             <>
               <Group id="preset" title={t("完成标准")} now={preset} hint={t("系统根据任务风险自动决定需要的验证程度，不再要求手动选择均衡或交付。")}>
