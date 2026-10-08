@@ -357,6 +357,10 @@ export class MockPort extends MockFeedback implements AgentPort {
     return paths.map((path) => ({ ref: "@" + path, path }));
   }
 
+  async workspaceGit() {
+    return { repo: true, name: "DeepSeek-Reasonix", branch: "studio", detached: false, added: 0, removed: 0, untracked: 0 };
+  }
+
   // The tree the scripted transcript is written against. It used to answer
   // repo:false, which made the panel fall back to the transcript — and left
   // every row unopenable, because only git can say what a path differs by.

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { reason } from "../i18n/kernel";
-import type { AgentPort, ChipCall, ModelEntry, SessionStatus, Attachment } from "../port/port";
+import type { AgentPort, ChipCall, ModelEntry, SessionStatus, Attachment, WorkspaceChanges, WorkspaceGit } from "../port/port";
 import { Picker } from "./Menu";
 import { Policy } from "./Policy";
 import { modelMenu } from "./modelmenu";
@@ -41,6 +41,7 @@ interface Props {
   onError: (e: unknown) => void;
   onSettings?: (section?: string) => void;
   changeCount?: number;
+  workspaceChanges?: WorkspaceChanges | null;
   // Bumped when settings change; a source edited there can change the ladder.
   pulse?: number;
   draftKey?: string;
@@ -91,17 +92,18 @@ function releaseChip(c: Chip) {
 let chipSeq = 0;
 const chipId = () => `c${++chipSeq}`;
 
-export function Composer({ port, status, running, quote, restore, focus, onSubmit, onChanged, onError, onSettings = () => {}, changeCount = 0, pulse = 0, draftKey = "" }: Props) {
+export function Composer({ port, status, running, quote, restore, focus, onSubmit, onChanged, onError, onSettings = () => {}, changeCount = 0, workspaceChanges, pulse = 0, draftKey = "" }: Props) {
   const touch = touchKeyboard();
   const providerOrder = useProviderOrder();
-  const [branch, setBranch] = useState("");
+  const [git, setGit] = useState<WorkspaceGit | null>();
   useEffect(() => {
     let alive = true;
-    port.capabilityScope()
-      .then((scope) => alive && setBranch(scope.repo ? (scope.branch || t("分离状态")) : ""))
-      .catch(() => alive && setBranch(""));
+    port.workspaceGit()
+      .then((info) => alive && setGit(info))
+      .catch(() => alive && setGit(null));
     return () => { alive = false; };
-  }, [port, status?.workspaceRoot]);
+  }, [port, status?.workspaceRoot, workspaceChanges]);
+  const branch = git?.repo ? git.detached ? t("分离状态 · {commit}", { commit: git.branch }) : git.branch : git === null ? t("Git 状态不可用") : git ? t("不是 Git 仓库") : "";
   const [submitting, setSubmitting] = useState(false);
   const { text, setText, beginSubmit, finishSubmit } = useDraft(draftKey, submitting);
   // The caret decides which token is being completed, so it is state here
@@ -681,16 +683,16 @@ export function Composer({ port, status, running, quote, restore, focus, onSubmi
             <div
               className="mode plain studio-branch"
               tabIndex={0}
-              aria-label={t("当前 Git 分支：{branch}", { branch })}
+              aria-label={git?.repo ? t("当前 Git 分支：{branch}", { branch }) : branch}
               aria-describedby={branchTipId}
             >
               <span className="ic" aria-hidden="true"><StudioIcon name="branch" /></span>
               <span className="lb">{branch}</span>
-              {changeCount > 0 && <small>{t("{n} 个变更", { n: changeCount })}</small>}
+              {git?.repo && changeCount > 0 && <small>{t("{n} 个变更", { n: changeCount })}</small>}
             </div>
             <div className="studio-branch-card" id={branchTipId} role="tooltip">
-              <b>{t("当前分支 · {branch}", { branch })}</b>
-              <span>{changeCount > 0 ? t("当前工作区 · {n} 个本地变更", { n: changeCount }) : t("当前工作区 · 后续任务继续使用此分支")}</span>
+              <b>{git?.repo ? t("当前分支 · {branch}", { branch }) : branch}</b>
+              <span>{git?.repo ? changeCount > 0 ? t("当前工作区 · {n} 个本地变更", { n: changeCount }) : t("当前工作区 · 后续任务继续使用此分支") : t("工作区 Git 信息未确认")}</span>
               <small>{t("仅作状态提示，无需点击")}</small>
             </div>
           </div>

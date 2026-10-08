@@ -1,6 +1,6 @@
 import { PLAN_ACTIONS, type PlanAction } from "./session";
 import type { AccountState, AgentPort, Appearance, ChipCall, CompactionSettings, Completion, DeviceGrant, ProviderProbe, UpdateProgress, VersionHub, VersionNotes, ApprovalMode, ApprovalVerdict, Checkpoint, RewindPlan, RewindResult, RewindScope, HistoryMessage, HostTodo, BrowserTab, ModelEntry, Preset, ProviderSetup, RoleAssignments, RoleOverride, SessionEntry, SessionStatus, WalletReading, HookDryRun, HookEntry, MemoryCatalog, MemoryEdit, MemoryEntry, UsageQuery, UsageReport, McpDraft, PluginExport, Queue, Queued, NotifyPrefs, TrayPrefs, WorkspaceInfo } from "./port";
-import { HttpError, type ChangeDiff, type CommitProposal, type CommitRequest, type CommitResult, type WorkspaceFile, type WorkspaceFiles, type WorkspaceChanges } from "./port";
+import { HttpError, type ChangeDiff, type CommitProposal, type CommitRequest, type CommitResult, type WorkspaceFile, type WorkspaceFiles, type WorkspaceChanges, type WorkspaceGit } from "./port";
 import { SseFeedback } from "./sse_feedback";
 import type { StoragePlan, StorageQuery, StorageState } from "./storage";
 import type { ExecutionGraphRead, TrajectoryRead, WireEvent } from "./wire";
@@ -435,6 +435,8 @@ export class SsePort extends SseFeedback implements AgentPort {
   changes() {
     return this.get<WorkspaceChanges>("/changes");
   }
+
+  workspaceGit() { return this.get<WorkspaceGit>("/workspace/git"); }
 
   changeDiff(path: string) {
     return this.get<ChangeDiff>(`/changes/diff?path=${encodeURIComponent(path)}`);

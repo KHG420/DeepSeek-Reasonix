@@ -17,6 +17,16 @@ export interface WorkspaceChanges {
   changes: WorkspaceChange[];
 }
 
+export interface WorkspaceGit {
+  repo: boolean;
+  name: string;
+  branch: string;
+  detached: boolean;
+  added: number;
+  removed: number;
+  untracked: number;
+}
+
 // One path's working-tree diff, as unified text for DiffView to render.
 // truncated says the kernel stopped at its cap rather than that the file is
 // unchanged — the two look the same at the end of a string otherwise.
