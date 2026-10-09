@@ -41,7 +41,7 @@ describe("the shared control tooltip", () => {
   });
 
   it("keeps a disabled refine button's glyph dimmed", () => {
-    const glyph = rules().find((r) => r.selector === ".studio-refine[disabled] > .studio-icon");
+    const glyph = rules().find((r) => r.selector === '.studio-refine[aria-disabled="true"] > .studio-icon');
     expect(glyph?.decls.get("opacity")).toBe(".35");
   });
 });
