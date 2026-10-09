@@ -12,6 +12,12 @@ afterEach(cleanup);
 // A copy button names what it copies wherever it says anything: on hover, to a
 // screen reader, and in its visible text when it has some.
 describe("a copy button", () => {
+  it("keeps the menu role and explicit accessible name together", () => {
+    render(<CopyButton text="answer" role="menuitem" label="Copy" ariaLabel="Copy selected reply" />);
+    const button = screen.getByRole("menuitem", { name: "Copy selected reply" });
+    expect(button.textContent).toBe("Copy");
+    expect(button.getAttribute("title")).toBe("Copy");
+  });
   it("on a code block, offers to copy the code rather than the response", () => {
     render(<CodeBlock lang="go" source={"x := 1\n"}><code>x := 1</code></CodeBlock>);
     const button = screen.getByRole("button", { name: t("复制这段代码") });
