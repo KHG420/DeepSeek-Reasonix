@@ -1,0 +1,2 @@
+.prefs .skgroup + .skgroup { margin-top: 20px; }
+.prefs .skgroup > h4 { margin: 0 0 8px; font: var(--w-med) var(--prefs-body)/1.5 var(--ui); color: var(--text); overflow-wrap: anywhere; }
