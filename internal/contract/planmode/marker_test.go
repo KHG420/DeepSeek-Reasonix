@@ -71,3 +71,41 @@ func TestSupersededMarkersAreHistoricalAndDistinct(t *testing.T) {
 		seen[s] = true
 	}
 }
+
+// A refusal is built from what the caller proved, so each class of cause reaches
+// the model with the call, the cause identity and the way out.
+func TestRefusalMessageCarriesSubjectCauseAndExit(t *testing.T) {
+	for _, tc := range []struct {
+		call Call
+		want []string
+	}{
+		{Call{Name: "bash", Proof: Proof{Why: WhyUnknownProgram, Subject: "curl x", Detail: "curl"}}, []string{"curl x", "Cause (unknown_program)", `"curl" is not in`}},
+		{Call{Name: "bash", Proof: Proof{Why: WhyShellConstruct, Subject: "ls $X", Detail: "shell expansion"}}, []string{"ls $X", "Cause (shell_construct)", "shell expansion"}},
+		{Call{Name: "bash", Effect: EffectSideEffect, Proof: Proof{Why: WhyWriteArguments, Subject: "find . -exec x", Detail: "find"}}, []string{"Cause (write_arguments)", `"find"`}},
+		{Call{Name: "write_file", Effect: EffectSideEffect, Proof: Proof{Why: WhyDeclaredWriter}}, []string{"Cause (declared_writer)", `"write_file" declares`}},
+		{Call{Name: "opaque"}, []string{"Cause (unproven)", `"opaque"`}},
+	} {
+		got := (Policy{}).Decide(tc.call)
+		if !got.Blocked {
+			t.Fatalf("%+v was admitted", tc.call)
+		}
+		for _, want := range append(tc.want, "present the plan", "read-only shell commands") {
+			if !strings.Contains(got.Message, want) {
+				t.Errorf("message for %+v missing %q:\n%s", tc.call.Name, want, got.Message)
+			}
+		}
+	}
+}
+
+// The marker defines what read-only shell means in the terms the refusal uses,
+// and the wording it replaced stays recognisable to sessions recorded under it.
+func TestMarkerDefinesReadOnlyShellAndKeepsPriorWording(t *testing.T) {
+	for _, want := range []string{"variable expansion", "command substitution", "assignment", "redirection", "background job", "states its cause"} {
+		if !strings.Contains(Marker, want) {
+			t.Errorf("Marker missing %q", want)
+		}
+	}
+	if strings.Contains(Superseded[len(Superseded)-1], "variable expansion") {
+		t.Error("the newest Superseded entry already carries the read-only shell definition")
+	}
+}
