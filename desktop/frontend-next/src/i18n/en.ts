@@ -123,6 +123,7 @@ export const EN: Record<string, string> = {
   "正在处理…": "Working…",
   "已完成": "Done",
   "已中断": "Interrupted",
+  "未执行": "Not run",
   "已停止": "Stopped",
   "请求未能送达内核（HTTP {status}）": "That request never reached the kernel (HTTP {status})",
   "移动 {id} 的界面": "Move {id}'s view",
@@ -415,7 +416,7 @@ export const EN: Record<string, string> = {
   // ── 高级外观 ─────────────────────────────────────────────────────
   "高级外观": "Advanced appearance",
   "已修改：{list}": "Changed: {list}",
-  "字体、文字粗细、文字对比度": "Fonts, text weight, text contrast",
+  "字体、文字粗细、文字对比度、视觉效果": "Fonts, text weight, text contrast, visual effects",
 
   // ── 明暗与配色 ───────────────────────────────────────────────────
   "明暗": "Light and dark",
@@ -435,6 +436,11 @@ export const EN: Record<string, string> = {
   "已设置自定义壁纸": "Custom wallpaper set",
   "壁纸与背景位置": "Wallpaper and background position",
   "文字粗细": "Text weight",
+  "视觉效果": "Visual effects",
+  "窗口持续占用显卡时，改为「节能」：界面不变，只去掉磨砂玻璃、动态天空和颗粒这几层。": "If the window keeps your GPU busy, choose Reduced: the layout stays as it is, only frosted glass, the animated sky and the grain layer go.",
+  "节能": "Reduced",
+  "背景模糊、动态天空与颗粒质感全部开启": "Background blur, the animated sky and the grain layer are all on",
+  "关闭背景模糊、动态天空与颗粒质感，集成显卡或老旧电脑上更省电": "Turns off background blur, the animated sky and the grain layer; lighter on integrated graphics and older machines",
   "调整文字的笔画粗细。中文笔画密集，在小字号下加粗有助于提升清晰度。": "Adjusts stroke weight. Dense Chinese glyphs lose definition first at small sizes, and more weight recovers it.",
   "跟随语言": "Match the language",
   "中文界面使用中等字重，西文使用常规字重": "Medium for Chinese, regular for Latin",
@@ -736,6 +742,12 @@ export const EN: Record<string, string> = {
   "无法连接版本目录": "Cannot reach the version index",
   "已固定": "Pinned",
   "固定在这里": "Pin here",
+  "更新内容": "What's new",
+  "收起更新内容": "Hide what's new",
+  "{v} 的更新内容": "What's new in {v}",
+  "正在读取更新内容…": "Loading what's new…",
+  "更新内容读取失败": "What's new could not be read",
+  "在 GitHub 查看": "View on GitHub",
 
   // ── 账号 ─────────────────────────────────────────────────────────
   "正在检查登录状态…": "Checking sign-in status…",
@@ -792,6 +804,7 @@ export const EN: Record<string, string> = {
   // ── 其余 ─────────────────────────────────────────────────────────
   "没有打开的会话": "No session open",
   "没有匹配的项": "Nothing matches",
+  "搜索模型或服务商…": "Search models or providers…",
   "筛选": "Filter",
   "补全": "Completions",
   "交还给插件": "Hand back to the extension",
@@ -1233,8 +1246,8 @@ export const EN: Record<string, string> = {
   "没有匹配的文件": "No matching files",
   "优化提示词":
     "Refine prompt",
-  "用当前模型改写得更清楚，采用前不会替换原文 · Ctrl+Shift+E":
-    "Rewrite it more clearly with the current model; your text stays until you adopt it · Ctrl+Shift+E",
+  "用当前模型改写得更清楚，采用前不会替换原文":
+    "Rewrite it more clearly with the current model; your text stays until you adopt it",
   "优化后的提示词":
     "Refined prompt",
   "输入框已修改，采用会覆盖当前内容":
@@ -1336,6 +1349,7 @@ export const EN: Record<string, string> = {
   "同一段内容被逐字重复": "The same block is being repeated verbatim",
   "任务已按设置暂停：模型卡在重复输出同一段文字": "Paused by your setting: the model is stuck repeating the same text",
   "等待你的输入": "Waiting for you",
+  "已恢复 {n} 条未完成的指令。待发送已暂停，请先在输入框上方的队列里查看，再点“继续派发”": "Recovered {n} unfinished instruction(s). Sending is paused: review them in the queue above the input box, then press Release",
   "待发送已暂停，这条消息已排入队列，点“继续派发”后才会发送": "Sending is paused. This message is queued and goes out once you press Release",
   "引导没有生效：这一轮在处理它之前就结束了。如果仍然需要，请再发送一次：": "Guidance was not applied because the turn ended before it could be processed. Send it again if it is still needed:",
   "费用显示币种已设为 {mode}": "Cost display currency set to {mode}",
