@@ -1,3 +1,4 @@
+import { FeedbackBadge, feedbackEntryTab } from "./feedbackentry";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { t } from "../i18n";
 import type { AccountState } from "../port/port";
@@ -13,6 +14,8 @@ import { chord } from "./keys";
 import { Palette, type Command } from "./Palette";
 import { Workspaces } from "./Workspaces";
 import { MASK, useHidesAmounts } from "./wallet";
+import "../styles/rail-drop.css";
+import { useFileDrop } from "./filedrop";
 
 interface Props {
   hub: HubPort;
@@ -112,6 +115,15 @@ export function Sidebar({
     [remotes, hiddenHosts],
   );
   const newSessionRoot = activeWorkspace?.root;
+  const [over, setOver] = useState(false);
+  const drop = useFileDrop((d) => {
+    if (collapsed || adder.busy || d.text) return;
+    if (d.paths.length !== 1) {
+      onError(new Error(d.paths.length ? t("请一次拖入一个文件夹") : t("无法取得本机路径，请使用添加文件夹")));
+      return;
+    }
+    adder.addPath(d.paths[0], (workspace) => onOpen({ root: workspace.root }));
+  }, (on, dt) => setOver(on && !!dt?.types.includes("Files")));
 
   // The shortcut the button prints. It was drawn and never bound, so the one
   // thing a person learns from the label did nothing.
@@ -189,7 +201,8 @@ export function Sidebar({
         中的面板。inert 是「看不见就够不着」那一半 —— 只做视觉隐藏的话，
         屏幕上没有的栏还能被 Tab 走进去。 */}
     <button className="railveil" data-action="chrome.rail" tabIndex={-1} aria-label={t("收起工作区栏")} onClick={() => onCollapse()} />
-    <div className="rail" inert={collapsed}>
+    <div className="rail" inert={collapsed} ref={drop}>
+      {over && !collapsed && !adder.busy && <div className="rail-drop" role="status"><StudioIcon name="folder" /><span>{t("松开以添加项目文件夹")}</span></div>}
       <div className="railscroll">
       <div className="studio-rail-head">
         <div className="studio-brand" aria-label="Reasonix Studio">
@@ -273,15 +286,10 @@ export function Sidebar({
       </div>
       <div className="railfoot">
         <button className="studio-wallet" data-action="settings.section" data-value="usage" onClick={() => onSettings("usage")}><span aria-hidden="true"><StudioIcon name="wallet" /></span><b>{t("钱包与用量")}</b>{wallet && <small>{hideAmounts ? MASK : wallet}</small>}</button>
-        <button className="studio-wallet studio-feedback" data-action="feedback.open" onClick={() => onFeedback(feedbackUnread > 0 ? "mine" : "send")}>
+        <button className="studio-wallet studio-feedback" data-action="feedback.open" onClick={() => onFeedback(feedbackEntryTab(feedbackUnread))}>
           <span aria-hidden="true"><StudioIcon name="feedback" /></span>
           <b>{t("发送反馈")}</b>
-          {feedbackUnread > 0 && (
-            <>
-              <i className="fbk-badge" aria-hidden="true" title={t("{n} 项待查看", { n: feedbackUnread })}>{feedbackUnread > 9 ? "9+" : feedbackUnread}</i>
-              <span className="sr-only">{t("{n} 项待查看", { n: feedbackUnread })}</span>
-            </>
-          )}
+          <FeedbackBadge unread={feedbackUnread} />
         </button>
         <div className="studio-user-foot">
           <AccountRow account={account} unread={accountUnread} onOpen={() => onSettings("account")} />
