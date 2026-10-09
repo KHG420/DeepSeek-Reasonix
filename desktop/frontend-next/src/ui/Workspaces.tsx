@@ -19,6 +19,7 @@ import { clearDraftForSession } from "./drafts";
 import { WorkspaceOrder, workspaceMenuKeys } from "./WorkspaceOrder";
 import { WorkspaceReveal } from "./WorkspaceReveal";
 import { Confirm, removeHint } from "./WorkspaceConfirm";
+import { SessionQuick } from "./SessionQuick";
 import { UnreadCount, UnreadDot } from "./UnreadMark";
 
 const parentOf = (root: string) => root.replace(/[/\\]+$/, "").split(/[/\\]/).slice(-2, -1)[0] ?? "";
@@ -205,6 +206,11 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
   const askDelete = (path: string) => {
     askedByKey.current = path;
     setConfirm(path);
+  };
+
+  const archive = (session: TreeSession) => {
+    setSessionMenu("");
+    void onArchive(session.path, !session.archived, session.runtimeId).catch(onError);
   };
 
   const dropSession = async (session: TreeSession) => {
@@ -548,6 +554,8 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
                             {`+${kept.length}`}
                           </button>
                         )}
+                        <SessionQuick session={session} label={rowLabel(session)} running={!!session.runtimeId && liveIds([session.runtimeId]).length > 0}
+                          onArchive={() => archive(session)} onDelete={() => askDelete(session.path)} />
                         {sessionMenu === session.path && createPortal(
                           <div ref={sessionMenuPortal} className="session-pop" role="menu" aria-label={t("会话操作")} style={{ maxHeight: "calc(100vh / var(--zoom, 1) - 24px)", overflowY: "auto" }} onClick={(ev) => ev.stopPropagation()}>
                             <div className="session-pop-head">
@@ -588,10 +596,7 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
                                 data-target={session.path}
                                 data-value={session.archived ? "restore" : "archive"}
                                 disabled={!!session.runtimeId && liveIds([session.runtimeId]).length > 0}
-                                onClick={() => {
-                                  setSessionMenu("");
-                                  void onArchive(session.path, !session.archived, session.runtimeId).catch(onError);
-                                }}
+                                onClick={() => archive(session)}
                               >
                                 <StudioIcon name="archive" /><span>{t(session.archived ? "取消归档" : "归档会话")}</span>
                               </button>
