@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
+import { SaveNote, saveNote, type SaveOutcome } from "./SaveNote";
 import { t } from "../i18n";
 import type { AgentPort, ShellOption, ShellSettings } from "../port/port";
-import { reason } from "../i18n/kernel";
 
 // The product name, not the executable: "powershell.exe" is what the file is
 // called, "Windows PowerShell" is what the user installed.
@@ -29,7 +29,7 @@ const kindOf = (path: string) => (/pwsh/i.test(path) ? "pwsh" : /powershell/i.te
 export function Shell({ port, onChanged }: { port: AgentPort; onChanged?: () => void }) {
   const [s, setS] = useState<ShellSettings | null>(null);
   const [busy, setBusy] = useState("");
-  const [failed, setFailed] = useState("");
+  const [note, setNote] = useState<SaveOutcome | null>(null);
   const [custom, setCustom] = useState("");
 
   const load = useCallback(() => {
@@ -52,14 +52,14 @@ export function Shell({ port, onChanged }: { port: AgentPort; onChanged?: () => 
   const pin = (o: ShellOption) => options.filter((x) => x.prefer === o.prefer).length > 1;
   const save = async (what: string, prefer: string, path: string) => {
     setBusy(what);
-    setFailed("");
+    setNote(null);
     try {
       const next = await port.saveShell(prefer, path);
       setS(next);
       setCustom(next.path ?? "");
       onChanged?.();
     } catch (e) {
-      setFailed(reason(e));
+      setNote(saveNote(e));
     } finally {
       setBusy("");
     }
@@ -146,12 +146,7 @@ export function Shell({ port, onChanged }: { port: AgentPort; onChanged?: () => 
         </div>
       </details>
 
-      {failed && (
-        <div className="find" data-lvl="warn" role="alert">
-          <span className="t">{t("切换失败")}</span>
-          <span className="why">{failed}</span>
-        </div>
-      )}
+      <SaveNote note={note} />
     </div>
   );
 }

@@ -3,9 +3,8 @@ import { t } from "../i18n";
 import type { ProviderCheck, ProviderEntry } from "../port/port";
 import { checkedFact, clearModelCheckFacts, ModelChoice, type ModelFact } from "./ModelChoice";
 import type { Port } from "./Providers";
-import { SAVED_NOT_APPLIED, reason, say } from "../i18n/kernel";
+import { savedNotApplied, reason, say } from "../i18n/kernel";
 import { checkFailure } from "./provider_check";
-import { HttpError } from "../port/port";
 import { IDLE_TIMEOUT_MAX, IDLE_TIMEOUT_MIN, THINKING, headerLines, parseEffortLevels, parseExtraBody, parseHeaders, parseIdleTimeout } from "./provider_compat";
 import { ModelEfforts } from "./ModelEfforts";
 import type { ModelEffort, ModelLimit, ProviderEdit } from "../port/port";
@@ -280,7 +279,7 @@ export function EditConn({
       await port.editProvider(draft());
       await onDone();
     } catch (e) {
-      const unapplied = e instanceof HttpError && SAVED_NOT_APPLIED.includes(e.reason?.code ?? "");
+      const unapplied = savedNotApplied(e);
       setErr({ text: reason(e), kind: unapplied ? "unapplied" : "save" });
       // Saved but not yet applied: the list has to show what is on file while
       // the form stays open to say why.
