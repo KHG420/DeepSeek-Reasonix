@@ -258,6 +258,7 @@ export const EN: Record<string, string> = {
   "标题": "Titling",
   "本会话": "This session",
   "计划": "Plan",
+  "目标": "Goal",
   "执行计划中": "Executing plan",
   "正在执行已批准的计划": "Executing an approved plan",
   "尚未制定": "None yet",
