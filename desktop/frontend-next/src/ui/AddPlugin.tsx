@@ -32,7 +32,13 @@ interface Props {
   onApplying?: (applying: boolean) => void;
 }
 
-export function AddPlugin({ port, onClose, onInstalled, updating, source, onApplying }: Props) {
+export function AddPlugin(props: Props) {
+  const [connection, setConnection] = useState({ port: props.port, generation: 0 });
+  if (connection.port !== props.port) setConnection({ port: props.port, generation: connection.generation + 1 });
+  return <PluginInput key={connection.generation} {...props} />;
+}
+
+function PluginInput({ port, onClose, onInstalled, updating, source, onApplying }: Props) {
   const sourceLabel = useId();
   const [text, setText] = useState(updating?.source ?? source ?? "");
   const [plan, setPlan] = useState<PluginPlan | null>(null);
