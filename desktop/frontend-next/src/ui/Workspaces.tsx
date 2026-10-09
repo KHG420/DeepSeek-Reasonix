@@ -20,6 +20,8 @@ import { WorkspaceOrder, workspaceMenuKeys } from "./WorkspaceOrder";
 import { WorkspaceReveal } from "./WorkspaceReveal";
 import { Confirm, removeHint } from "./WorkspaceConfirm";
 import { UnreadCount, UnreadDot } from "./UnreadMark";
+import { useSessionSelection } from "./sessionselection";
+import { SessionBatch } from "./SessionBatch";
 
 const parentOf = (root: string) => root.replace(/[/\\]+$/, "").split(/[/\\]/).slice(-2, -1)[0] ?? "";
 
@@ -285,11 +287,16 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
   // A fold is a resting-state preference: while a word is being typed it would
   // hide the very rows that word just found.
   const shutHere = needle ? false : hereShut;
+  const { selection, setSelection, toggleSelection, selected, displayed, rows } = useSessionSelection(shownTree, folded, whole, shutHere, needle, scope, SHOWN);
 
   return (
     <>
+      <SessionBatch hub={hub} selection={selection} selected={selected} displayed={displayed} onSelect={setSelection}
+        onExit={() => treeKeys.ref.current?.querySelector<HTMLElement>('[role="treeitem"]')?.focus()}
+        onBusy={(pending) => { setBusy(pending ? "batch" : ""); if (pending) { setSessionMenu(""); setEditing(""); setConfirm(""); } }}
+        onClose={onClose} onArchive={onArchive} liveIds={liveIds} reload={reload} onError={onError} />
       <div className="scroll">
-        <div role="tree" aria-label={t("机器、工作区与会话")} data-action-keydown="tree.navigate" ref={treeKeys.ref} onKeyDown={treeKeys.onKeyDown}>
+        <div role="tree" aria-label={t("机器、工作区与会话")} aria-multiselectable={selection !== null} inert={busy === "batch"} data-action-keydown="tree.navigate" ref={treeKeys.ref} onKeyDown={treeKeys.onKeyDown}>
           {/* This machine is the first row of the list rather than another kind of
               thing, and its add button sits where a host's does: open a folder
               on this machine. */}
@@ -431,7 +438,7 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
                     两级差 18px，扫一眼只读得出“有点错位”。 */}
                 {!shut && (
                   <div className="kids">
-                {(whole.has(ws.root) ? ws.sessions : ws.sessions.slice(0, SHOWN)).map((session) => {
+                {(rows.get(ws.root) ?? []).map((session) => {
                     const on = opening ? session.path === opening : session.runtimeId === active;
                     const run = session.runtimeId ? runs[session.runtimeId]?.run : undefined;
                     if (confirm === session.path) {
@@ -455,23 +462,24 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
                       <Fragment key={session.path}>
                       <div
                         ref={sessionMenu === session.path ? sessionMenuBox : undefined}
-                        data-action-click="session.open"
+                        data-action-click={selection ? "session.selection" : "session.open"}
                         data-action-contextmenu="session.menu"
                         aria-haspopup="menu"
-                        data-action-keydown={["session.open", "session.delete"]}
+                        data-action-keydown={selection ? ["session.selection"] : ["session.open", "session.delete"]}
                         data-target={session.path}
                         className="sessrow sessrow-context"
                         role="treeitem"
-                        aria-selected={on}
+                        aria-selected={selection ? selection.has(session.path) : on}
                         data-on={on ? "" : undefined}
                         data-live={session.runtimeId ? "" : undefined}
                         data-run={run === "idle" ? undefined : run}
                         data-unread={session.unread ? "" : undefined}
                         data-just-done={session.runtimeId && justDone.has(session.runtimeId) ? "" : undefined}
                         data-busy={opening === session.path ? "" : undefined}
-                        onClick={() => void pick(ws, session)}
+                        onClick={() => selection ? toggleSelection(session.path) : void pick(ws, session)}
                         onContextMenu={(ev) => {
                           if ((ev.target as HTMLElement).closest("input, textarea, [role='menu']")) return;
+                          if (selection) { ev.preventDefault(); return; }
                           ev.preventDefault();
                           ev.stopPropagation();
                           menuTrigger.current = ev.currentTarget;
@@ -482,6 +490,10 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
                         onKeyDown={(ev) => {
                           if (ev.target !== ev.currentTarget) return;
                           if (editing === session.path) return;
+                          if (selection) {
+                            if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); toggleSelection(session.path); }
+                            return;
+                          }
                           if (ev.key === "Enter" || ev.key === " ") {
                             ev.preventDefault();
                             void pick(ws, session);
@@ -491,6 +503,9 @@ function WorkspacesView({ hub, tree, treeRead, runtimes, active, folded, reload,
                           }
                         }}
                       >
+                        {selection && <input type="checkbox" className="session-select" tabIndex={-1} aria-label={t("选择会话：{name}", { name: rowLabel(session) })}
+                          data-action-click="session.selection" data-action-change="session.selection" data-target={session.path} checked={selection.has(session.path)}
+                          onClick={(ev) => ev.stopPropagation()} onChange={() => toggleSelection(session.path)} />}
                         <i className="pip" />
                         {editing === session.path ? (
                           <input
