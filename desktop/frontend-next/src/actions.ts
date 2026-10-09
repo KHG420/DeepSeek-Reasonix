@@ -364,6 +364,8 @@ export const ACTIONS: UIAction[] = [
   { id: "compaction.threshold", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   // Which bound is in force is the setting; how much of it is on screen is not.
   { id: "compaction.advanced", kind: "view", target: "none", proof: "interaction" },
+  { id: "compaction.confirm", kind: "view", target: "none", proof: "interaction" },
+  { id: "compaction.now", kind: "kernel-mutation", target: "none", proof: "interaction" },
   { id: "panel.move", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "panel.delegate-placement", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "context.window-tokens", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
@@ -391,6 +393,9 @@ export const ACTIONS: UIAction[] = [
   { id: "versions.activate", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "versions.restart", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "versions.later", kind: "view", target: "none", proof: "interaction" },
+  { id: "versions.notes", kind: "repeatable", target: "none", proof: "interaction" },
+  { id: "versions.notes-retry", kind: "repeatable", target: "none", proof: "interaction" },
+  { id: "versions.notes-close", kind: "view", target: "none", proof: "interaction" },
   { id: "shell.executor", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "shell.custom-path", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "hooks.recipe", kind: "kernel-mutation", target: "entity", proof: "authority-effect" },
@@ -438,6 +443,7 @@ export const ACTIONS: UIAction[] = [
   { id: "appearance.scheme", kind: "view", target: "none", proof: "browser" },
   { id: "appearance.weight", kind: "view", target: "none", proof: "browser" },
   { id: "appearance.contrast", kind: "view", target: "none", proof: "browser" },
+  { id: "appearance.effects", kind: "view", target: "none", proof: "browser" },
   { id: "pane.close", kind: "destructive", target: "none", proof: "authority-effect" },
   { id: "settings.section", kind: "navigation", target: "none", proof: "interaction" },
   // Finding a setting changes what is on screen and nothing else: it reaches
