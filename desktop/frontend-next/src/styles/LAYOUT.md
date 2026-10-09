@@ -244,6 +244,10 @@ rules are written in.
 
 ## Columns and the seam
 
+- The sidebar footer supplies usage, feedback, account and settings only when
+  the global icon navigation is not visible. It follows the window's existing
+  navigation visibility state, including collapsed-only mode and narrow-window
+  folds, so both columns never offer the same footer actions together.
 - Column widths change on `.app`, so the tween belongs there and `.cols` only
   reads the result into a track. The tween must be cut during a drag: a .34s
   tween makes the column chase the pointer.
