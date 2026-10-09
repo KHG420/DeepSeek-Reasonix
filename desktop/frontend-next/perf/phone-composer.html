@@ -1,0 +1,23 @@
+<!doctype html><html><head><title>Phone composer running</title></head><body><h1>Phone composer geometry guard</h1><pre id="result"></pre><script type="module">
+const frame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+const results = [];
+for (const theme of ['light', 'dark']) {
+  const scene = document.createElement('iframe');
+  scene.width = 390; scene.height = 760; scene.src = '/perf.html?pref=zh&turns=4'; document.body.append(scene);
+  await new Promise(r => scene.addEventListener('load', r, {once:true}));
+  const d = scene.contentDocument;
+  while (!d.querySelector('.studio-mode-picker')) await frame();
+  await d.fonts.ready; d.documentElement.dataset.theme = theme; await frame();
+  d.activeElement?.blur(); await frame();
+  const box = d.querySelector('textarea[role="combobox"]');
+  const mode = d.querySelector('.studio-mode-picker');
+  const rect = e => {const r=e.getBoundingClientRect(); return {x:r.x,y:r.y,width:r.width,height:r.height};};
+  const quiet = {box:rect(box), mode:rect(mode), padding:getComputedStyle(mode).paddingInlineStart, refine:rect(d.querySelector('.studio-refine')).height};
+  mode.focus(); await frame(); const toolbar = rect(mode);
+  box.focus(); await frame(); const focused = rect(box);
+  const pass = quiet.box.height <= parseFloat(getComputedStyle(box).lineHeight)+1 && quiet.refine === 0 && quiet.padding === '0px' && JSON.stringify(quiet.mode) === JSON.stringify(toolbar) && focused.height > quiet.box.height;
+  results.push({theme,quiet,toolbar,focused,pass,scope:'390px iframe; programmatic focus geometry; physical touch unverified'});
+  document.getElementById('result').textContent=JSON.stringify(results,null,2);
+}
+document.title=results.every(r=>r.pass)?'Phone composer PASS':'Phone composer FAIL';
+</script></body></html>

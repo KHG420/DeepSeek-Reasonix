@@ -2222,7 +2222,9 @@ body { font-size: 14px; line-height: 1.75; }
 .studio-model-control { min-width: 0; max-width: 180px; flex: 0 1 auto; }
 .studio-mode-picker,
 .studio-effort-picker,
-.model-picker { gap: 5px; padding-inline: 7px !important; font-size: 10px !important; font-weight: 500 !important; }
+.model-picker { gap: 5px; font-size: 10px !important; font-weight: 500 !important; }
+.compose .studio-mode-picker { padding-inline: 7px; }
+:is(.studio-effort-picker, .model-picker) { padding-inline: 7px !important; }
 .studio-mode-picker { min-height: 32px !important; font-size: 11px !important; }
 .studio-mode-picker > .studio-icon:first-child {
   width: 15px;
@@ -2335,7 +2337,6 @@ body { font-size: 14px; line-height: 1.75; }
   min-width: 29px !important;
   height: 29px !important;
   padding: 0 !important;
-  display: grid !important;
   place-items: center;
   border: 1px solid transparent !important;
   border-radius: 999px !important;
@@ -2344,6 +2345,7 @@ body { font-size: 14px; line-height: 1.75; }
   transform: none !important;
   transition: background-color 140ms ease, color 140ms ease !important;
 }
+.compose .turntools .studio-attach { display: grid; }
 .studio-attach > .studio-icon { width: 16px; height: 16px; stroke-width: 1.65; }
 .studio-attach:hover { color: var(--text) !important; background: var(--hair) !important; border-color: transparent !important; outline: none; transform: none !important; }
 .studio-attach:focus-visible {
@@ -2415,9 +2417,8 @@ body { font-size: 14px; line-height: 1.75; }
   .turntools .policy > .mode { width: 30px; justify-content: center; padding-inline: 0; }
   .turntools .policy .lb,
   .turntools .policy .studio-control-chevron { display: none; }
-  .studio-mode-picker,
-  .studio-effort-picker,
-  .model-picker { padding-inline: 5px !important; }
+  .compose .studio-mode-picker { padding-inline: 5px; }
+  :is(.studio-effort-picker, .model-picker) { padding-inline: 5px !important; }
   .studio-meter-speed .spark,
   .studio-meterrail .studio-meter-wallet { display: none; }
 }
@@ -2437,7 +2438,7 @@ body { font-size: 14px; line-height: 1.75; }
 
 @container conversation (max-width: 360px) {
   .studio-branch-pop { display: none; }
-  .studio-mode-picker { width: 30px; justify-content: center; padding-inline: 0 !important; }
+  .compose .studio-mode-picker { width: 30px; justify-content: center; padding-inline: 0; }
   .studio-mode-picker > span:not(.studio-sr-label),
   .studio-mode-picker > .studio-icon:last-child { display: none; }
   .studio-meterrail .studio-meter-cost,

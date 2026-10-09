@@ -1,3 +1,4 @@
+import "../styles/phone-composer.css";
 import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { t } from "../i18n";
 import { reason } from "../i18n/kernel";
