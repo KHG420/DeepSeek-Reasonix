@@ -704,6 +704,10 @@ func CompoundLeaves(command string) (leaves [][]string, why StaticRejectReason, 
 // program name.
 const dynamicArgPlaceholder = "__reasonix_dynamic_arg__"
 
+// IsDynamicArg reports whether a leaf argument returned by CompoundLeaves stands
+// for a word only known at run time.
+func IsDynamicArg(field string) bool { return field == dynamicArgPlaceholder }
+
 // StdinHereDocPrograms returns the program name of every command in the
 // statement whose standard input comes from a here-document, at any nesting.
 // The caller decides which programs treat that input as source code.

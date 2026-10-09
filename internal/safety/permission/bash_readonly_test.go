@@ -2,6 +2,7 @@ package permission
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"reasonix/internal/base/shellparse"
@@ -270,12 +271,16 @@ func TestBashReadOnlyProofNamesWhatStoppedTheCommand(t *testing.T) {
 		{"A=1; ls", planmode.Proof{Why: planmode.WhyShellConstruct, Detail: string(shellparse.StaticRejectAssignment)}},
 		{"ls > out.txt", planmode.Proof{Why: planmode.WhyShellConstruct, Detail: string(shellparse.StaticRejectRedirection)}},
 		{"ls; echo $(pwd)", planmode.Proof{Why: planmode.WhyShellConstruct, Detail: string(shellparse.StaticRejectExpansion)}},
+		{"git $X; ls", planmode.Proof{Why: planmode.WhyShellConstruct, Detail: string(shellparse.StaticRejectExpansion)}},
 		{"find . -exec rm {} ;", planmode.Proof{Why: planmode.WhyWriteArguments, Detail: "find"}},
 		{"ls && sort -o f f", planmode.Proof{Why: planmode.WhyWriteArguments, Detail: "sort"}},
 	} {
 		args, _ := json.Marshal(map[string]string{"command": tc.command})
 		readOnly, got := BashReadOnlyProof(args)
 		got.Subject = ""
+		if strings.Contains(got.Detail, "__reasonix") {
+			t.Errorf("%q leaked an internal placeholder: %+v", tc.command, got)
+		}
 		if got != tc.want || readOnly != (tc.want.Why == "") || readOnly != BashCommandIsReadOnly(args) {
 			t.Errorf("%q: readOnly=%v proof=%+v, want %+v", tc.command, readOnly, got, tc.want)
 		}

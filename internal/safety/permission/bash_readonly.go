@@ -89,6 +89,9 @@ func leavesProof(leaves [][]string) (bool, planmode.Proof) {
 	for _, argv := range leaves {
 		base, sub, fields, classified := shellsafe.ClassifyReadOnlyFields(argv)
 		if !classified {
+			if len(argv) > 1 && shellparse.IsDynamicArg(argv[1]) {
+				return false, planmode.Proof{Why: planmode.WhyShellConstruct, Detail: string(shellparse.StaticRejectExpansion)}
+			}
 			return false, planmode.Proof{Why: planmode.WhyUnknownProgram, Detail: programLabel(argv)}
 		}
 		if readOnly, proof := argsProof(base, sub, fields); !readOnly {

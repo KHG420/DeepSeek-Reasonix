@@ -3,6 +3,8 @@ package planmode
 import (
 	"fmt"
 	"strings"
+
+	"reasonix/internal/base/textutil"
 )
 
 // Why is what the caller's own classifier established about a call it could not
@@ -44,10 +46,15 @@ const planningExit = "While planning, these run normally: reading, searching and
 	"To run this call as written, present the plan and stop: once the user approves, the call goes through the " +
 	"ordinary Permissions and Sandbox path."
 
+func shown(s string, lim textutil.PreviewLimit) string {
+	out, _ := textutil.BoundLiteral(strings.TrimSpace(s), lim)
+	return out
+}
+
 func causeLine(name string, p Proof) string {
 	switch p.Why {
 	case WhyDeclaredWriter:
-		return fmt.Sprintf("%q declares that it can change state outside this session.", name)
+		return fmt.Sprintf("%q is not a read-only tool, so it can change state outside this session.", name)
 	case WhyWriteArguments:
 		return fmt.Sprintf("the arguments given to %q make it write or run another program.", p.Detail)
 	case WhyUnknownProgram:
@@ -65,10 +72,11 @@ func causeLine(name string, p Proof) string {
 }
 
 func refusalMessage(call Call) string {
-	name := strings.TrimSpace(call.Name)
+	name := shown(call.Name, textutil.PreviewIdentity)
+	call.Proof.Detail = shown(call.Proof.Detail, textutil.PreviewIdentity)
 	var b strings.Builder
 	fmt.Fprintf(&b, "blocked: Plan mode is still planning, and this %q call was refused", name)
-	if s := strings.TrimSpace(call.Proof.Subject); s != "" {
+	if s := shown(call.Proof.Subject, textutil.PreviewLocator); s != "" {
 		fmt.Fprintf(&b, ": %s", s)
 	}
 	why := call.Proof.Why
