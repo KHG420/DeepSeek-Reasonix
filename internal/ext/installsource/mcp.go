@@ -69,7 +69,7 @@ func mcpActionRisk(e config.PluginEntry, reasons []string) (RiskLevel, []string)
 	for k, v := range e.Headers {
 		if secrets.CredentialKey(k) || secrets.CredentialValue(v) {
 			hasAuth = true
-			reasons = append(reasons, "sends auth headers to "+secrets.RedactEndpoint(e.URL))
+			reasons = append(reasons, "sends auth headers to "+hostLiteral(secrets.RedactEndpoint(e.URL)))
 		}
 	}
 	if e.Tier == "eager" {
@@ -231,7 +231,7 @@ func parseMCPJSON(b []byte) ([]config.PluginEntry, []string, error) {
 		}
 		tier, ok := normalizeTier(s.Tier)
 		if !ok && strings.TrimSpace(s.Tier) != "" {
-			warnings = append(warnings, fmt.Sprintf("%s: tier %q is unknown; treating as background", name, s.Tier))
+			warnings = append(warnings, fmt.Sprintf("%s: tier %q is unknown; treating as background", hostLiteral(name), s.Tier))
 		}
 		e := config.PluginEntry{
 			Name:                  name,
@@ -259,7 +259,7 @@ func parseMCPJSON(b []byte) ([]config.PluginEntry, []string, error) {
 		normalized, changed := config.NormalizePluginCommandLine(e)
 		e = normalized
 		if changed {
-			warnings = append(warnings, fmt.Sprintf("%s: split a pasted MCP command line into command and args", name))
+			warnings = append(warnings, fmt.Sprintf("%s: split a pasted MCP command line into command and args", hostLiteral(name)))
 		}
 		if err := validateMCPEntry(e); err != nil {
 			return nil, warnings, err

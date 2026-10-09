@@ -32,7 +32,7 @@ func Open(ctx context.Context, dir string) (Repo, error) {
 	if err != nil {
 		return Repo{}, err
 	}
-	out, err := Command(ctx, abs, "rev-parse", "--absolute-git-dir", "--git-common-dir", "--show-toplevel").Output()
+	out, err := Command(ctx, abs, "rev-parse", "--path-format=absolute", "--absolute-git-dir", "--git-common-dir", "--show-toplevel").Output()
 	var exit *exec.ExitError
 	if errors.As(err, &exit) {
 		return Repo{}, fmt.Errorf("%w: %s", ErrNotRepository, abs)

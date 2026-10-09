@@ -59,6 +59,7 @@ type Messages struct {
 	NoticeCompacted              string            // /compact succeeded
 	NoticeCompactDeclinedFmt     string            // /compact declined — %s the reason
 	NoticeCompactFailedFmt       string            // /compact failed — %s the reason
+	NoticeCompactHeldFmt         string            // automatic compaction held after a failed attempt — %s the reason
 	NoSessionToResume            string            // shown when --continue / --resume finds nothing
 	NoSessionToResumeStartingNew string            // shown when --continue finds nothing and a fresh session starts
 	ResumeRequiresTTY            string            // shown when --resume runs piped instead of on a terminal
@@ -88,6 +89,10 @@ type Messages struct {
 	TUIDeclinedFmt          string // an approval the user refused — %s tool, %s subject
 	NoticeUnappliedSteerFmt string // guidance that arrived too late for its turn — %s the guidance
 	NoticeExtSkippedFmt     string // an optional extension skipped, its sidecar not running — %s extension, %s point
+	NoticeJobFinishedFmt    string // a background job ended — %s its label, else its id
+	NoticeJobKilledFmt      string // a background job was killed — %s its label, else its id
+	NoticeJobFailedFmt      string // a background job failed — %s its label, else its id
+	NoticeInboxRecoveredFmt string // a reopened inbox came up paused with unfinished instructions — %d count
 	TUIQuestion             string // an answered question that carried no prompt
 	TUISubagentCallsFmt     string // calls a sub-agent made under its task — %d count
 	TUIChartMoreRowsFmt     string // rows of a chart table past the preview — %d count
@@ -283,6 +288,9 @@ type Messages struct {
 	McpPanelDetailHint           string // /mcp server detail keyboard hint
 	McpPanelNoTools              string // /mcp server detail: nothing to list
 	McpPanelOff                  string // /mcp panel row: server switched off
+	McpPanelPending              string // /mcp panel row: repository server awaiting the user's approval
+	McpPanelChanged              string // /mcp panel row: what an enabled repository server launches changed
+	McpPanelLaunchFmt            string // /mcp panel: what the selected pending server would start
 	McpToolDestructive           string // /mcp detail: tool tag
 	McpToolReadOnly              string // /mcp detail: tool tag
 	McpPanelConfirmFmt           string // /mcp: enabling a repository-declared server; server name and launch line

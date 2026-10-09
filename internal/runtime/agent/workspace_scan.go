@@ -92,19 +92,20 @@ func (w *scanWalk) dir(path string) {
 			return
 		}
 		full := filepath.Join(path, e.Name())
+		if fileutil.IsVCSStoreDir(e.Name()) {
+			continue
+		}
 		if e.IsDir() {
-			if !fileutil.IsVCSStoreDir(e.Name()) {
-				if w.stopped() {
-					return
-				}
-				w.wg.Add(1)
-				select {
-				case w.jobs <- full:
-				default:
-					// A saturated pool must recurse inline to keep descendants moving.
-					w.dir(full)
-					w.wg.Done()
-				}
+			if w.stopped() {
+				return
+			}
+			w.wg.Add(1)
+			select {
+			case w.jobs <- full:
+			default:
+				// A saturated pool must recurse inline to keep descendants moving.
+				w.dir(full)
+				w.wg.Done()
 			}
 			continue
 		}

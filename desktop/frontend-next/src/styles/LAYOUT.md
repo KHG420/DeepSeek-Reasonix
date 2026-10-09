@@ -298,6 +298,9 @@ rules are written in.
 - The rail and the workbench are both `inert` while collapsed, and the workbench
   stops painting once the collapse has finished. The shortcut and the gutter
   that reopen a column sit outside it, so they stay reachable.
+- The icon column keeps its open width and slides by `--nav-w - --nav-open`; it
+  is never clipped to a width. Its hover hints hang outside it, so any ancestor
+  `overflow` would cut them. `perf/navhint.mjs` measures every hint in each mode.
 - Collapsing reflows the text inside a column, which is what makes it feel
   wrong. The contents are locked to the open width so they are clipped rather
   than squeezed, and they shrink faster than the container: what is seen is

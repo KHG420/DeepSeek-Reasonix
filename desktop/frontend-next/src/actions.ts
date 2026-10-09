@@ -127,6 +127,11 @@ export const ACTIONS: UIAction[] = [
   { id: "commit.confirm", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "commit.close", kind: "view", target: "none", proof: "interaction" },
 
+  // ── Which branch the workspace is on ─────────────────────────────────────
+  // The composer's branch chip opens the locals; picking one checks it out in
+  // the workspace and re-reads what the checkout moved.
+  { id: "git.branch", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
+
   // ── What is waiting to be sent ───────────────────────────────────────────
   { id: "queue.edit", kind: "kernel-mutation", target: "entity", proof: "interaction" },
   // Giving a session a name of your own. The sidebar's tree and the pane tabs
@@ -391,6 +396,9 @@ export const ACTIONS: UIAction[] = [
   { id: "versions.activate", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "versions.restart", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "versions.later", kind: "view", target: "none", proof: "interaction" },
+  { id: "versions.notes", kind: "repeatable", target: "none", proof: "interaction" },
+  { id: "versions.notes-retry", kind: "repeatable", target: "none", proof: "interaction" },
+  { id: "versions.notes-close", kind: "view", target: "none", proof: "interaction" },
   { id: "shell.executor", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "shell.custom-path", kind: "kernel-mutation", target: "none", proof: "authority-effect" },
   { id: "hooks.recipe", kind: "kernel-mutation", target: "entity", proof: "authority-effect" },
@@ -438,6 +446,7 @@ export const ACTIONS: UIAction[] = [
   { id: "appearance.scheme", kind: "view", target: "none", proof: "browser" },
   { id: "appearance.weight", kind: "view", target: "none", proof: "browser" },
   { id: "appearance.contrast", kind: "view", target: "none", proof: "browser" },
+  { id: "appearance.effects", kind: "view", target: "none", proof: "browser" },
   { id: "pane.close", kind: "destructive", target: "none", proof: "authority-effect" },
   { id: "settings.section", kind: "navigation", target: "none", proof: "interaction" },
   // Finding a setting changes what is on screen and nothing else: it reaches
