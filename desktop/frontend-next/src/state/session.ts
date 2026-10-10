@@ -452,7 +452,7 @@ function apply(s: SessionState, ev: SessionEvent): SessionState {
       return ev.approval ? prompted(s, "等待批准", { t: "approval", id: nextId(), a: ev.approval }) : s;
 
     case "ask_request":
-      return ev.ask ? prompted(s, "等待确认", { t: "ask", id: nextId(), ask: ev.ask }) : s;
+      return ev.ask ? prompted(s, "等待你回答", { t: "ask", id: nextId(), ask: ev.ask }) : s;
 
     case "compaction_started":
       return { ...s, items: [...s.items, { t: "compaction", id: nextId(), c: ev.compaction ?? {}, done: false }] };
