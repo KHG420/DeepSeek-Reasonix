@@ -132,19 +132,16 @@ func (s *shellProofStore) holds(path string, fi os.FileInfo) bool {
 	return false
 }
 
-// record keeps a successful probe. Persistence is best effort: a store that
+// record keeps a successful probe under the digest taken before it ran, so a
+// file swapped during the probe is never vouched for. Persistence is best effort: a store that
 // cannot be written only costs the next launch one probe.
-func (s *shellProofStore) record(path string, fi os.FileInfo) {
+func (s *shellProofStore) record(path string, fi os.FileInfo, digest string) {
 	if s == nil {
 		return
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	loc := s.location()
-	digest, ok := digestFile(path)
-	if !ok {
-		return
-	}
 	dir := filepath.Dir(loc)
 	if err := os.MkdirAll(dir, 0o700); err != nil || !plainDir(dir) {
 		return

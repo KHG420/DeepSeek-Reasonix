@@ -19,7 +19,7 @@ type ShellDiscovery struct {
 	// ProofDir, when set, keeps launch proofs between runs. It must sit in the
 	// user's own data tree; a proof never changes a sandbox decision.
 	ProofDir string
-	// Probe replaces the bash launch probe. Proofs it earns last only for this call.
+	// Probe replaces the bash launch probe. The in-process memo is private to this call; proofs still persist to ProofDir.
 	Probe  func(string) bool
 	Budget time.Duration
 	Hedge  time.Duration
@@ -188,10 +188,16 @@ func proveBash(path string, run func(string) bool, store *shellProofStore, memo 
 		memo.Store(id, struct{}{})
 		return true
 	}
+	digest := ""
+	if store != nil {
+		digest, _ = digestFile(path)
+	}
 	if !run(path) {
 		return false
 	}
 	memo.Store(id, struct{}{})
-	store.record(path, fi)
+	if digest != "" {
+		store.record(path, fi, digest)
+	}
 	return true
 }

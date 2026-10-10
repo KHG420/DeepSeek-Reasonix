@@ -146,6 +146,23 @@ func TestShellProofMissesWhenTheStoreIsTamperedWith(t *testing.T) {
 	}
 }
 
+func TestShellProofIsNotRecordedForAFileSwappedDuringTheProbe(t *testing.T) {
+	_, exe, n := proofFixture(t)
+	swap := func(string) bool {
+		n.Add(1)
+		if err := os.WriteFile(exe, []byte("swapped"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		return true
+	}
+	prove(exe, swap)
+	restart()
+	prove(exe, countingRun(n, true))
+	if n.Load() != 2 {
+		t.Fatalf("launches = %d, want the swapped file proved again, not vouched for", n.Load())
+	}
+}
+
 func TestShellProofExpires(t *testing.T) {
 	_, exe, n := proofFixture(t)
 	prove(exe, countingRun(n, true))
@@ -305,7 +322,7 @@ func TestShellProofStoreWithoutADirectoryHoldsNothing(t *testing.T) {
 	_, exe, _ := proofFixture(t)
 	fi, _ := os.Stat(exe)
 	var none *shellProofStore
-	none.record(exe, fi)
+	none.record(exe, fi, "x")
 	if none.holds(exe, fi) {
 		t.Fatal("a nil store vouched for an executable")
 	}
