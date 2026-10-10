@@ -64,6 +64,7 @@ export const EN_KERNEL: Record<string, string> = {
   "这台服务器未开放配置编辑": "This server does not allow editing its config",
   "该文件需手动修改：{detail}": "This file needs an edit by hand: {detail}",
   "设置已写入，但运行时未能按新设置重建：{detail}": "The settings were written, but the runtime could not be rebuilt on them: {detail}",
+  "规则 {rule} 没有对应的工具（{tool}），匹配不到任何调用，因此未保存；命令要写成 Bash(命令:*)": "Rule {rule} names no tool ({tool}), so it would match no call and was not saved. A shell command is written Bash(command:*).",
   "该权限未能保存：{detail}": "That permission was not saved: {detail}",
   "沙箱设置未能保存：{detail}": "The sandbox settings were not saved: {detail}",
   "内置浏览器设置未能保存：{detail}": "The built-in browser setting was not saved: {detail}",
