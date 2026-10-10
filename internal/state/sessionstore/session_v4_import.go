@@ -2,6 +2,7 @@ package sessionstore
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -184,16 +185,19 @@ func ImportV4From(store fs.FS, dir string, route func(sessionID string) string) 
 	}
 	imported := 0
 	var skipped []SkippedSession
-	skip := func(name string, err error) {
-		skipped = append(skipped, SkippedSession{Name: name, Path: name, Reason: classifySkip(err)})
+	skip := func(name string, reason SkipReason) {
+		skipped = append(skipped, SkippedSession{Name: name, Path: name, Reason: reason})
 	}
 	for _, e := range entries {
 		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
 			continue
 		}
 		s, err := sessionv4.OpenIn(store, e.Name())
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
 		if err != nil {
-			skip(e.Name(), err)
+			skip(e.Name(), classifySkip(err))
 			continue
 		}
 		id := s.Manifest.SessionID
@@ -209,18 +213,18 @@ func ImportV4From(store fs.FS, dir string, route func(sessionID string) string) 
 		}
 		t, err := s.Transcript()
 		if err != nil {
-			skip(e.Name(), err)
+			skip(e.Name(), classifySkip(err))
 			continue
 		}
 		if _, turns := SessionPreviewFromMessages(t.Messages); turns == 0 {
 			continue
 		}
 		if err := os.MkdirAll(target, 0o755); err != nil {
-			skip(e.Name(), err)
+			skip(e.Name(), classifyWriteSkip(err))
 			continue
 		}
 		if err := importV4(path, s); err != nil {
-			skip(e.Name(), err)
+			skip(e.Name(), classifyWriteSkip(err))
 			continue
 		}
 		imported++

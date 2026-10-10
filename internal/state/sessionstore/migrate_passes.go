@@ -57,7 +57,7 @@ func importBakSessions(entries []os.DirEntry, srcDir, globalDest string, hasEven
 		}
 		srcInfo, _ := e.Info()
 		if err := transformAndCopyJsonl(bakPath, dest); err != nil {
-			rep.skipErr(bakPath, err)
+			rep.skipWrite(bakPath, err)
 			continue
 		}
 		if srcInfo != nil {
@@ -85,7 +85,7 @@ func migrateProjectSubdirs(entries []os.DirEntry, srcDir, globalDest string, pro
 		subDir := filepath.Join(srcDir, e.Name())
 		subEntries, err := readDirUnder(srcDir, e.Name())
 		if err != nil {
-			rep.skipErr(subDir, err)
+			rep.skipRead(subDir, err)
 			continue
 		}
 		hasSessions := false
@@ -101,7 +101,7 @@ func migrateProjectSubdirs(entries []os.DirEntry, srcDir, globalDest string, pro
 		}
 		n, err := migrateSubDirectory(subDir, globalDest, projectDir, rep)
 		if err != nil {
-			rep.skipErr(subDir, err)
+			rep.skipRead(subDir, err)
 			continue
 		}
 		imported += n

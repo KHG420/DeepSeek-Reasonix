@@ -13,6 +13,7 @@ export const EN_STORAGE: Record<string, string> = {
   "这个文件夹里没有找到旧版会话。请选择 Reasonix 的数据文件夹（里面有 sessions、projects 或 desktop-sessions-v5）。":
     "No older sessions were found in this folder. Pick the Reasonix data folder (the one holding sessions, projects or desktop-sessions-v5).",
   "有 {n} 项无法读取。": "{n} items could not be read.",
+  "复制路径：{name}": "Copy path: {name}",
   "有 {n} 个会话没有导入": "{n} sessions were not imported",
   "这些文件仍在原位置，没有被移动或删除。可复制路径自行处理，或修复后重新导入。":
     "These files are still where they were; nothing was moved or deleted. Copy a path to deal with it yourself, or fix it and import again.",

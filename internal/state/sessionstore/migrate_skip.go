@@ -30,8 +30,9 @@ type SkippedSession struct {
 	Reason SkipReason
 }
 
-// classifySkip maps the reader's structured failure to its class. Size is
-// checked before damage because an oversized record is reported as both.
+// classifySkip maps a failure to read a source entry to its class. Size is
+// checked before damage because an oversized record is reported as both; a read
+// failure with no sentinel is an entry this reader cannot make sense of.
 func classifySkip(err error) SkipReason {
 	switch {
 	case errors.Is(err, fs.ErrPermission):
@@ -40,11 +41,17 @@ func classifySkip(err error) SkipReason {
 		return SkipTooLarge
 	case errors.Is(err, sessionv4.ErrUnsupported):
 		return SkipSchemaUnsupported
-	case errors.Is(err, sessionv4.ErrDamaged):
-		return SkipCorrupt
 	default:
-		return SkipCopyFailed
+		return SkipCorrupt
 	}
+}
+
+// classifyWriteSkip is the class of a failure to write the imported copy.
+func classifyWriteSkip(err error) SkipReason {
+	if errors.Is(err, fs.ErrPermission) {
+		return SkipPermission
+	}
+	return SkipCopyFailed
 }
 
 func (r *LegacyReport) skip(path string, reason SkipReason) {
@@ -53,6 +60,10 @@ func (r *LegacyReport) skip(path string, reason SkipReason) {
 	}
 }
 
-func (r *LegacyReport) skipErr(path string, err error) {
+func (r *LegacyReport) skipRead(path string, err error) {
 	r.skip(path, classifySkip(err))
+}
+
+func (r *LegacyReport) skipWrite(path string, err error) {
+	r.skip(path, classifyWriteSkip(err))
 }

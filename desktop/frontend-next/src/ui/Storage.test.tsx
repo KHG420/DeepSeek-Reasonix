@@ -118,8 +118,15 @@ it("copies the path of a skipped session", async () => {
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
   recover({ imported: 0, warnings: 1, recognised: true, skipped: [skip("aaa", "permission")] });
   await pickOld();
-  fireEvent.click(screen.getByText("复制路径"));
+  fireEvent.click(screen.getByLabelText("复制路径：aaa"));
   expect(writeText).toHaveBeenCalledWith("/old/sessions-v4/aaa");
+});
+
+it("names the session on every copy button", async () => {
+  recover({ imported: 0, warnings: 2, recognised: true, skipped: [skip("aaa", "corrupt"), skip("bbb", "corrupt")] });
+  await pickOld();
+  expect(screen.getByLabelText("复制路径：aaa")).toBeTruthy();
+  expect(screen.getByLabelText("复制路径：bbb")).toBeTruthy();
 });
 
 it("draws no list when nothing was skipped", async () => {

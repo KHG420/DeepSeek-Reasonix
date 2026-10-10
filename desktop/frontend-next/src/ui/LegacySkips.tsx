@@ -23,7 +23,7 @@ export function LegacySkips({ skipped }: { skipped: LegacySkip[] }) {
             <b>{skip.name}</b>
             <span className="hint">{t(REASON[skip.reason] ?? REASON.copy_failed)}</span>
             <span className="p">{skip.path}</span>
-            <CopyButton text={skip.path} label={t("复制路径")} />
+            <CopyButton text={skip.path} label={t("复制路径")} ariaLabel={t("复制路径：{name}", { name: skip.name })} />
           </div>
         </div>
       ))}

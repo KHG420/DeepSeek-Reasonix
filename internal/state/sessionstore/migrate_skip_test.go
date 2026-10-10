@@ -19,11 +19,20 @@ func TestClassifySkipReadsTheSentinelNotTheSentence(t *testing.T) {
 		{fmt.Errorf("w: %w", bufio.ErrTooLong), SkipTooLarge},
 		{fmt.Errorf("%w: revision 9", sessionv4.ErrUnsupported), SkipSchemaUnsupported},
 		{fmt.Errorf("%w: frame magic", sessionv4.ErrDamaged), SkipCorrupt},
-		{fmt.Errorf("disk full"), SkipCopyFailed},
+		{fmt.Errorf("no sentinel on a read"), SkipCorrupt},
 	}
 	for _, c := range cases {
 		if got := classifySkip(c.err); got != c.want {
 			t.Errorf("%v classified %q, want %q", c.err, got, c.want)
 		}
+	}
+}
+
+func TestClassifyWriteSkipKeepsCopyFailedForWrites(t *testing.T) {
+	if got := classifyWriteSkip(fmt.Errorf("disk full")); got != SkipCopyFailed {
+		t.Errorf("write failure classified %q, want copy_failed", got)
+	}
+	if got := classifyWriteSkip(fmt.Errorf("x: %w", fs.ErrPermission)); got != SkipPermission {
+		t.Errorf("denied write classified %q, want permission", got)
 	}
 }

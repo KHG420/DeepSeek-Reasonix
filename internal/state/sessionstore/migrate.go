@@ -118,7 +118,7 @@ func migrateLegacySessionsWithMarkers(srcDir, globalDest, marker, jsonlMarker st
 	}
 	entries, err := os.ReadDir(srcDir)
 	if err != nil {
-		rep.skipErr(srcDir, err)
+		rep.skipRead(srcDir, err)
 		return 0, nil
 	}
 
@@ -185,7 +185,7 @@ func migrateLegacySessionsWithMarkers(srcDir, globalDest, marker, jsonlMarker st
 		msgs, err := reconstructSession(filepath.Join(srcDir, name))
 		if err != nil || len(msgs) == 0 {
 			if err != nil {
-				rep.skipErr(filepath.Join(srcDir, name), err)
+				rep.skipRead(filepath.Join(srcDir, name), err)
 			} else if eventsInfo != nil && eventsInfo.Size() > 0 {
 				rep.skip(filepath.Join(srcDir, name), SkipUnreadableFormat)
 			}
@@ -393,7 +393,7 @@ func migrateSubDirectory(subDir, globalDest string, projectDir func(string) stri
 			msgs, err := reconstructSession(srcPath)
 			if err != nil || len(msgs) == 0 {
 				if err != nil {
-					rep.skipErr(srcPath, err)
+					rep.skipRead(srcPath, err)
 				}
 				continue
 			}
@@ -406,12 +406,12 @@ func migrateSubDirectory(subDir, globalDest string, projectDir func(string) stri
 			}
 		} else if isNativeSessionEventLog(SessionEventLogPath(srcPath)) {
 			if err := saveNativeSessionCopy(srcPath, dest); err != nil {
-				rep.skipErr(srcPath, err)
+				rep.skipRead(srcPath, err)
 				continue
 			}
 		} else {
 			if err := transformAndCopyJsonl(srcPath, dest); err != nil {
-				rep.skipErr(srcPath, err)
+				rep.skipWrite(srcPath, err)
 				continue
 			}
 		}

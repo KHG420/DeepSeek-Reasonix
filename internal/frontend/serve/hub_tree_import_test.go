@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -189,6 +190,75 @@ func TestImportLegacyNamesEverySessionItCouldNotReadWithATypedReason(t *testing.
 		}
 		if _, err := os.Stat(s.Path); err != nil {
 			t.Errorf("%s: the source entry is gone: %v", s.Name, err)
+		}
+	}
+}
+
+func TestImportLegacyAttributesReadAndWriteFailuresToTheirOwnClass(t *testing.T) {
+	if runtime.GOOS == "windows" || os.Geteuid() == 0 {
+		t.Skip("permission bits are not enforced here")
+	}
+	home := testenv.TempDir(t)
+	t.Setenv("REASONIX_HOME", home)
+	t.Setenv("REASONIX_STATE_HOME", home)
+	root := testenv.TempDir(t)
+	h := NewHub(HubOptions{})
+	hubRuntime(t, h, root)
+	srv := httptest.NewServer(operatorHandler(h))
+	defer srv.Close()
+
+	old := testenv.TempDir(t)
+	store := v4fixture.New(t)
+	const denied, missing = "4123456789abcdef0123456789abcdef", "5123456789abcdef0123456789abcdef"
+	store.Batch(store.Session(denied, 3), v4fixture.Ended,
+		v4fixture.Event{Kind: "message/complete", Payload: v4fixture.Msg("m1", "user", "x")})
+	store.Batch(store.Session(missing, 3), v4fixture.Ended,
+		v4fixture.Event{Kind: "message/complete", Ref: &v4fixture.Ref{Digest: strings.Repeat("b", 64), Bytes: 10}})
+	if err := os.MkdirAll(filepath.Join(store.Root, "artifacts"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(store.Root, filepath.Join(old, "sessions-v4")); err != nil {
+		t.Fatal(err)
+	}
+	manifest := filepath.Join(old, "sessions-v4", denied, "manifest.json")
+	if err := os.Chmod(manifest, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(manifest, 0o600) })
+	sessions := filepath.Join(old, "sessions")
+	if err := os.MkdirAll(sessions, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	log := `{"role":"user","content":"hello"}` + "\n" + `{"role":"assistant","content":"hi"}` + "\n"
+	if err := os.WriteFile(filepath.Join(sessions, "w.jsonl"), []byte(log), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	dest := SessionDirFor(root)
+	if err := os.MkdirAll(dest, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(dest, 0o500); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dest, 0o755) })
+
+	body, _ := json.Marshal(map[string]string{"path": old, "workspace": root})
+	resp, err := http.Post(srv.URL+"/tree/sessions/import-legacy", "application/json", bytes.NewReader(body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	var got skipAnswer
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{denied: "permission", missing: "corrupt", "w.jsonl": "copy_failed"}
+	if len(got.Skipped) != len(want) {
+		t.Fatalf("answered %+v, want exactly %v (a folder with no manifest is not a session)", got.Skipped, want)
+	}
+	for _, s := range got.Skipped {
+		if want[s.Name] != s.Reason {
+			t.Errorf("%s skipped as %q, want %q", s.Name, s.Reason, want[s.Name])
 		}
 	}
 }
