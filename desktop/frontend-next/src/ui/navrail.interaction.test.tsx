@@ -154,8 +154,10 @@ it.each(["on", "off"])("reaches usage, account, and settings with the rail %s", 
   localStorage.setItem(KEY, mode);
   await open();
   const entries = mode === "on" ? navEl()! : document.querySelector<HTMLElement>(".railfoot")!;
-  for (const [label, section] of [[mode === "on" ? "用量" : "钱包与用量", "usage"], ["账号", "account"], ["设置", "session"]]) {
-    await userEvent.click(within(entries).getByRole("button", { name: new RegExp(`^${label}`) }));
+  for (const [label, section, action] of [[mode === "on" ? "用量" : "钱包与用量", "usage"], ["账号", "account", "chrome.account"], ["设置", "session", "chrome.settings"]]) {
+    const button = within(entries).getByRole("button", { name: new RegExp(`^${label}`) });
+    if (action) expect(entries.querySelector(`[data-action="${action}"]`)).toBe(button);
+    await userEvent.click(button);
     expect((await screen.findByRole("tabpanel")).getAttribute("data-sec")).toBe(section);
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "设置" })).toBeNull();
