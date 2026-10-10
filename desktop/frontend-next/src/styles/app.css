@@ -1531,8 +1531,8 @@
   .opt-other .lb { color: var(--muted) }
   .opt-other[data-on] .lb { color: var(--text) }
 
-  .other-wrap { display: none; margin-top: 7px }
-  .other-wrap[data-on] { display: block; animation: card var(--t-card) var(--ease-out) both }
+  .other-wrap { margin-top: 8px }
+  .ask[data-sealed] .other-wrap:not([data-on]) { display: none }
   .other-wrap input {
     width: 100%; padding: 9px 11px; border-radius: var(--r-sm);
     border: 1px solid color-mix(in srgb, var(--accent) 46%, var(--border));

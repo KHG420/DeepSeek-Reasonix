@@ -477,7 +477,7 @@ function PaneView({ port, rt, title, active, visible, sideHost, side, onFocus, o
         </span>
         {/* Everything stacked above the input box shares one ceiling, so no
             child of this region may grow without bound. */}
-        <PlanFold plan={s.plan} shown={tab === "flow"} />
+        <PlanFold plan={s.plan} shown={tab === "flow"} paused={blocked} />
         {tab === "flow" && <RunLine label={chipLabel(s, running)} running={running} blocked={blocked} sent={sent} received={received} estimated={s.outLive > 0} />}
         <div className="composeaux">
           <Queue
@@ -547,6 +547,7 @@ function PaneView({ port, rt, title, active, visible, sideHost, side, onFocus, o
             done={!running}
             posture={posture(run, blocked)}
             plan={s.plan}
+            blocked={blocked}
             wallet={wallet}
             account={status?.providerDisplayName || accountOf(status?.modelRef)}
             onRefreshWallet={refreshWallet}

@@ -500,7 +500,7 @@ describe("a question the run is still blocked on", () => {
 
   it("survives the rebuild that follows a reconnect", () => {
     const s = run([asking("ask-1"), rebuild([said("有一个技术决策需要确认：")])]);
-    expect(s.doing, "the header says the run is waiting on you").toBe("等待确认");
+    expect(s.doing, "the header says the run is waiting on you").toBe("等待你回答");
     expect(asks(s), "so the question has to still be answerable").toHaveLength(1);
     expect(asks(s)[0].ask.id).toBe("ask-1");
   });

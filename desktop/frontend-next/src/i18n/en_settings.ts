@@ -428,7 +428,7 @@ export const EN_SETTINGS: Record<string, string> = {
   "内核已记入会话授权，不写入磁盘。": "The kernel records it for this session only; nothing is written to disk.",
   "agent 已收到拒绝，将改用其他方式或终止。": "The agent takes the refusal and either finds another way or stops.",
   "下次同样的操作仍会请求确认。": "The same operation will ask again next time.",
-  "在此填写你希望采用的方案": "Which one you want, or write your own here",
+  "或直接输入你的回答": "Or type your own answer",
   "补充说明（可选）": "Note (optional)",
   "补充说明（可选），会随所选项一起发送": "Add a note (optional) — it is sent with your choice",
   "问题 {n}": "Question {n}",
