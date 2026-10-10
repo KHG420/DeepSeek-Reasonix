@@ -116,6 +116,11 @@ var mirroredWireTypes = []wireMirror{
 	// The sidebar row. The unread mark is derived by the kernel from two stored
 	// timestamps; a row the page cannot read it from shows a finished turn as seen.
 	{"internal/frontend/serve/hub_tree.go", "treeSession", tsHubFile, "TreeSession"},
+	// A session the import left in place. The reason code is what the window
+	// words the explanation from; a code it cannot read is a skipped session
+	// reported as nothing more than a count.
+	{"internal/frontend/serve/hub_tree.go", "legacySkipView", tsHubFile, "LegacySkip"},
+	{"internal/frontend/serve/hub_tree.go", "legacyImportView", tsHubFile, "LegacyImport"},
 	// What waits on the user, and which call answers it. The desktop reads this
 	// list as the whole set of open prompts — one it cannot read is a card it
 	// seals as decided while the run stays blocked on it.
