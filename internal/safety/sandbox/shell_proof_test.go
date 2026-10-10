@@ -148,9 +148,13 @@ func TestShellProofMissesWhenTheStoreIsTamperedWith(t *testing.T) {
 
 func TestShellProofIsNotRecordedForAFileSwappedDuringTheProbe(t *testing.T) {
 	_, exe, n := proofFixture(t)
+	fi, _ := os.Stat(exe)
 	swap := func(string) bool {
 		n.Add(1)
-		if err := os.WriteFile(exe, []byte("swapped"), 0o700); err != nil {
+		if err := os.WriteFile(exe, []byte("two"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(exe, fi.ModTime(), fi.ModTime()); err != nil {
 			t.Fatal(err)
 		}
 		return true
