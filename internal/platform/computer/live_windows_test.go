@@ -195,15 +195,15 @@ func TestLiveWindowsThePointerReachesWhatAccessibilityCannot(t *testing.T) {
 		t.Fatalf("pointer_position: %v", err)
 	}
 	if res, err := s.Act(ctx, windowsTarget, []Step{{Action: "pointer_click", X: x, Y: y}}); err != nil {
-		t.Fatalf("pointer_click: %v (%v)", err, res.Notes)
+		t.Fatalf("pointer_click: %v (%v)", err, res.Steps)
 	}
 	waitLog(t, p.log, "mouseDown")
 	back, err := s.Act(ctx, windowsTarget, []Step{{Action: "pointer_position"}})
 	if err != nil {
 		t.Fatalf("pointer_position: %v", err)
 	}
-	if back.Notes[0] != home.Notes[0] {
-		t.Fatalf("the pointer was left at %q, not where the person had it (%q)", back.Notes[0], home.Notes[0])
+	if back.Steps[0].Note != home.Steps[0].Note {
+		t.Fatalf("the pointer was left at %q, not where the person had it (%q)", back.Steps[0].Note, home.Steps[0].Note)
 	}
 	toX, toY := *x+40, *y-20
 	if _, err := s.Act(ctx, windowsTarget, []Step{{Action: "pointer_drag", X: x, Y: y, ToX: &toX, ToY: &toY}}); err != nil {
