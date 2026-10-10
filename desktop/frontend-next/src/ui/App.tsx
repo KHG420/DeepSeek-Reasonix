@@ -601,6 +601,7 @@ export function App({ hub }: { hub: HubPort }) {
         <Sidebar
           hub={hub}
           collapsed={!rail}
+          navShown={navRail.shown}
           tree={viewed.tree}
           treeRead={treeRead}
           runtimes={runtimes}
