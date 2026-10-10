@@ -704,3 +704,24 @@ describe("chipLabel", () => {
     expect(chipLabel(live, true)).toBe(live.doing);
   });
 });
+
+describe("compaction digest restart", () => {
+  const progress = (text?: string): SessionEvent => ({ kind: "compaction_progress", text }) as SessionEvent;
+  const summaryOf = (s: SessionState) => (s.items.find((i) => i.t === "compaction") as Extract<Item, { t: "compaction" }>).c.summary;
+
+  it("keeps only the retried attempt's text when the first was cut", () => {
+    const s = run([
+      { kind: "compaction_started", compaction: {} } as SessionEvent,
+      progress("## Goal\ncut off mid"),
+      progress(),
+      progress("## Goal\nsecond"),
+    ]);
+    expect(summaryOf(s)).toBe("## Goal\nsecond");
+  });
+
+  it("shows nothing from the cut attempt if the retry writes nothing", () => {
+    const s = run([{ kind: "compaction_started", compaction: {} } as SessionEvent, progress("cut"), progress()]);
+    expect(summaryOf(s)).toBe("");
+  });
+
+});
