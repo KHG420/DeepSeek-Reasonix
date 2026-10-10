@@ -36,7 +36,10 @@ func poolFor(store fs.FS, sessionName, named string) contentPool {
 
 // read returns an object's bytes after checking its size and digest.
 func (p contentPool) read(ref contentRef) ([]byte, error) {
-	if len(ref.Digest) != sha256.Size*2 || ref.Bytes < 0 || ref.Bytes > maxObjectBytes {
+	if ref.Bytes > maxObjectBytes {
+		return nil, fmt.Errorf("%w: content %s holds %d bytes", ErrTooLarge, ref.Digest, ref.Bytes)
+	}
+	if len(ref.Digest) != sha256.Size*2 || ref.Bytes < 0 {
 		return nil, fmt.Errorf("invalid content reference %q", ref.Digest)
 	}
 	if _, err := hex.DecodeString(ref.Digest); err != nil {
