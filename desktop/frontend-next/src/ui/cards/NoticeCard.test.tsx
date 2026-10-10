@@ -124,6 +124,15 @@ describe("a coded notice with a payload", () => {
     expect(box.querySelector(".find .t")?.textContent).toContain("Recovered 2 pending");
   });
 
+  it("words the dormant permission rules from their payload and draws no raw payload line", () => {
+    const detail = '{"rules":[{"list":"ask","rule":"rm","tool":"rm"},{"list":"deny","rule":"git reset","tool":"git reset"}]}';
+    const box = draw({ level: "warn", code: "permission_rules_dormant", text: "Permission rules that name no tool match nothing", detail });
+    expect(box.querySelector(".find .t")?.textContent).toBe(t("有 {n} 条权限规则没有对应的工具，匹配不到任何调用，因此起不到限制作用（如「{list}」里的 {rule}）；到「设置 → 权限」里删除或改写，命令要写成 Bash(命令:*)", { n: 2, list: t("询问"), rule: "rm" }));
+    expect(box.querySelector(".find .why")).toBeNull();
+    const garbled = draw({ level: "warn", code: "permission_rules_dormant", text: "Permission rules that name no tool match nothing", detail: "garbled" });
+    expect(garbled.querySelector(".find .t")?.textContent).toContain("match nothing");
+  });
+
   it("wraps the user's unapplied guidance in this build's sentence and keeps their words verbatim", () => {
     const box = draw({
       code: "unapplied_steer",

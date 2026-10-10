@@ -2,6 +2,7 @@ import type { Item } from "../../state/session";
 import { t } from "../../i18n";
 import { NOTICE_TEXT } from "../../i18n/notices";
 import { EXTENSION_SKIPPED, extensionSkippedVars } from "../../i18n/extension_skipped";
+import { PERMISSION_RULES_DORMANT, permissionRulesDormantVars } from "../../i18n/permission_rules_dormant";
 import { INBOX_RECOVERED, inboxRecoveredVars } from "../../i18n/inbox_recovered";
 import { JOB_FAILED, JOB_FINISHED, JOB_KILLED, jobErrorText, jobNoticeVars } from "../../i18n/job_notice";
 import { FOLD_WHY, NO_CODE_WHY } from "../../i18n/compaction_why";
@@ -37,8 +38,9 @@ export function NoticeCard({ item }: { item: Extract<Item, { t: "notice" }> }) {
   const skipped = item.code === EXTENSION_SKIPPED ? extensionSkippedVars(item.detail) : undefined;
   const recovered = item.code === INBOX_RECOVERED ? inboxRecoveredVars(item.detail) : undefined;
   const job = item.code === JOB_FINISHED || item.code === JOB_KILLED || item.code === JOB_FAILED ? jobNoticeVars(item.detail) : undefined;
-  const vars: Record<string, string | number> | undefined = stored ? { mode: item.detail || "auto" } : reason ? { why: t(reason) } : skipped ?? recovered ?? job;
-  const wording = item.code && (!reasoned || vars) && (item.code !== EXTENSION_SKIPPED || skipped) && (item.code !== INBOX_RECOVERED || recovered) && ((item.code !== JOB_FINISHED && item.code !== JOB_KILLED && item.code !== JOB_FAILED) || job) ? NOTICE_TEXT[item.code] : undefined;
+  const dormant = item.code === PERMISSION_RULES_DORMANT ? permissionRulesDormantVars(item.detail) : undefined;
+  const vars: Record<string, string | number> | undefined = stored ? { mode: item.detail || "auto" } : reason ? { why: t(reason) } : skipped ?? recovered ?? job ?? dormant;
+  const wording = item.code && (!reasoned || vars) && (item.code !== EXTENSION_SKIPPED || skipped) && (item.code !== INBOX_RECOVERED || recovered) && (item.code !== PERMISSION_RULES_DORMANT || dormant) && ((item.code !== JOB_FINISHED && item.code !== JOB_KILLED && item.code !== JOB_FAILED) || job) ? NOTICE_TEXT[item.code] : undefined;
   const claim = item.workspaceLease;
   const detail = claim
     ? workspaceLeaseDetail(claim, item.code !== "workspace_lease_resumed") || item.detail

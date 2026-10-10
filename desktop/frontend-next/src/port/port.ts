@@ -248,8 +248,9 @@ export interface AgentPort {
   permissions(): Promise<PermissionRules>;
   // Replaces all three lists at once, then rebuilds — the gate is assembled
   // with the runtime, so a rule cannot reach one that is already up. Every rule
-  // is validated by the parser the gate itself uses, so a typo comes back as an
-  // error here rather than as a rule that silently never matches.
+  // is validated by the parser the gate itself uses, and a rule added here that
+  // names no tool is refused with permissions.rule_unknown_tool; one already in
+  // the file is kept and listed in PermissionRules.dormant.
   savePermissions(lists: PermissionLists): Promise<PermissionRules>;
   /** Take back what a prompt allowed for this session — one rule, or all of them when rule is "". */
   revokeSessionGrant(rule: string): Promise<PermissionRules>;

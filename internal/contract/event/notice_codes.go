@@ -53,6 +53,8 @@ const (
 	NoticeCodeSessionContinuedFrom1x = "session_continued_from_1x"
 	// The user config names a default approval mode this build does not know; it loads as ask.
 	NoticeCodeApprovalModeUnrecognized = "approval_mode_unrecognized"
+	// Saved permission rules name no tool, so they match nothing; Detail is a PermissionRulesDormant.
+	NoticeCodePermissionRulesDormant = "permission_rules_dormant"
 	// A turn handed its open list back to the user; Detail is the model's `need`, as it wrote it.
 	NoticeCodeAwaitUser = "await_user"
 	// A slash command nothing resolves, refused rather than sent as prose.

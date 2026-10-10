@@ -335,6 +335,7 @@ const SAID: Record<string, string> = {
   "config.editing_disabled": "这台服务器未开放配置编辑",
   "config.not_repairable": "该文件需手动修改：{detail}",
   "runtime.rebuild_failed": "设置已写入，但运行时未能按新设置重建：{detail}",
+  "permissions.rule_unknown_tool": "规则 {rule} 没有对应的工具（{tool}），匹配不到任何调用，因此未保存；命令要写成 Bash(命令:*)",
   "permissions.rejected": "该权限未能保存：{detail}",
   "sandbox.rejected": "沙箱设置未能保存：{detail}",
   "compaction.rejected": "压缩阈值未能保存：{detail}",

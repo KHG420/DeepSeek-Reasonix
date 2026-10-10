@@ -33,6 +33,7 @@ export const NOTICE_TEXT: Record<string, string> = {
   compact_declined: "无需压缩：{why}",
   compact_failed: "压缩失败：{why}",
   compact_held: "自动压缩暂缓，上次尝试没有完成：{why}",
+  permission_rules_dormant: "有 {n} 条权限规则没有对应的工具，匹配不到任何调用，因此起不到限制作用（如「{list}」里的 {rule}）；到「设置 → 权限」里删除或改写，命令要写成 Bash(命令:*)",
   extension_skipped: "扩展 {ext} 的配套后台程序没有运行，该扩展本次（在 {point}）已被跳过；到「工具与集成」里查看并启动它，或停用该扩展",
   perseveration_loop: "模型卡在重复输出同一段文字，这一轮已停止；可以重试、补充引导，或换一个供应商/模型",
 };

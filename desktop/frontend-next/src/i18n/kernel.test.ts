@@ -35,6 +35,14 @@ describe("what a reader is told a refusal was", () => {
       expect(english).not.toBe("fixture fallback");
     }
   });
+  it("names the rule and the tool when a permission rule reaches no tool", () => {
+    const refusal = coded("fixture fallback", "permissions.rule_unknown_tool", { list: "ask", rule: "rm", tool: "rm" });
+    const chinese = reason(refusal);
+    expect(chinese).toContain("rm");
+    expect(chinese).not.toContain("fixture fallback");
+    localStorage.setItem(STORAGE, "en"); boot();
+    expect(reason(refusal)).toContain("names no tool");
+  });
   it("tells a running turn from jobs left after it, and counts the jobs", () => {
     const turn = reason(coded("fixture fallback", "busy.switch_model"));
     const jobs = reason(coded("fixture fallback", "busy.switch_model_jobs", { count: 3 }));
