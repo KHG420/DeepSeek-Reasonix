@@ -215,11 +215,12 @@ func (b *builder) load() error {
 	if opts.resolvedShell != nil {
 		b.shell = *opts.resolvedShell
 	} else {
-		b.shell = resolveShellWithNotice(cfg.Tools.Shell.Prefer, cfg.Tools.Shell.Path, b.stderr, b.sink)
+		b.shell = resolveShellWithNotice(opts, cfg.Tools.Shell.Prefer, cfg.Tools.Shell.Path, b.stderr, b.sink)
 	}
 	// Record the resolved interpreter for diagnostics, staying at Debug because
 	// headless `run` must leave stderr empty unless --debug is passed. A launch
 	// failure emits an always-on Warn with the same kind/path/source fields.
+	b.timer.mark("shell")
 	slog.Debug("boot: shell tool interpreter resolved", "kind", b.shell.Kind.String(), "path", b.shell.Path, "prefer", cfg.Tools.Shell.Prefer)
 	b.prompt, err = buildPromptAssembly(b.ctx, opts, cfg, b.root, b.shell, b.sink, b.timer)
 	return err
@@ -228,9 +229,13 @@ func (b *builder) load() error {
 // resolveShellWithNotice keeps shell-discovery warnings on stderr for CLI
 // diagnostics and also reports them through the boot sink, where the settings
 // surface can show which interpreter actually runs.
-func resolveShellWithNotice(prefer, path string, stderr io.Writer, sink event.Sink) sandbox.Shell {
+func resolveShellWithNotice(opts Options, prefer, path string, stderr io.Writer, sink event.Sink) sandbox.Shell {
 	var warnings strings.Builder
-	shell := sandbox.ResolveShell(prefer, path, io.MultiWriter(stderr, &warnings))
+	d := sandbox.ShellDiscovery{Prefer: prefer, Path: path, Warn: io.MultiWriter(stderr, &warnings), ProofDir: opts.roots().CacheDir()}
+	if opts.tuneShell != nil {
+		opts.tuneShell(&d)
+	}
+	shell := d.Resolve()
 	if detail := strings.TrimSpace(warnings.String()); detail != "" {
 		report(sink, event.Event{Level: event.LevelWarn, Text: "Shell tool interpreter fallback.", Detail: detail})
 	}
