@@ -121,7 +121,7 @@ func TestRefusalMessageBoundsAndEscapesTheEchoedCommand(t *testing.T) {
 		t.Fatalf("message is %d bytes", len(got))
 	}
 	forgedLines := 0
-	for _, line := range strings.Split(got, "\n") {
+	for line := range strings.SplitSeq(got, "\n") {
 		if strings.HasPrefix(line, "Cause (") {
 			forgedLines++
 		}
