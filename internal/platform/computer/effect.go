@@ -1,8 +1,10 @@
 package computer
 
 import (
-	"fmt"
 	"slices"
+	"strings"
+
+	"reasonix/internal/base/textutil"
 )
 
 // EffectClass is how far a step that reached the application is known to
@@ -47,17 +49,28 @@ type Modal struct {
 	Blocks string `json:"blocks"`
 }
 
+// modalNameLimit is the length the helpers clip every other label in a tree
+// to; a modal's names are the application's to choose, so they get no more.
+var modalNameLimit = textutil.PreviewLimit{Graphemes: 160, Lines: 1}
+
+// shownName quotes an application-chosen name bounded, with every control and
+// invisible character, and the quote itself, rendered as a visible escape.
+func shownName(s string) string {
+	bounded, _ := textutil.BoundLiteral(s, modalNameLimit)
+	return `"` + strings.ReplaceAll(bounded, `"`, `\u{22}`) + `"`
+}
+
 func (m Modal) String() string {
 	title := m.Title
 	if title == "" {
 		title = "(untitled)"
 	}
-	s := fmt.Sprintf("the modal %q", title)
+	s := "the modal " + shownName(title)
 	if m.Ref != "" {
 		s += " [" + m.Ref + "]"
 	}
 	if m.Blocks != "" {
-		s += fmt.Sprintf(" over %q", m.Blocks)
+		s += " over " + shownName(m.Blocks)
 	}
 	return s
 }
