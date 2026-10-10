@@ -106,6 +106,9 @@ func TestLiveWindowsOperatesAnApplication(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Act: %v (done %d)", err, res.Done)
 	}
+	if e := res.Steps[4].Effect; e.Class != EffectConfirmed {
+		t.Errorf("typing after the end of a value = %+v, want confirmed", e)
+	}
 	waitLog(t, p.log, "button pressed 1")
 	waitLog(t, p.log, "text from-ax 李雷3\ntext \n")
 
@@ -165,7 +168,7 @@ func TestLiveWindowsPasteGivesTheClipboardBack(t *testing.T) {
 	}
 	field := lineRef(t, snap.Lines, `edit "Probe field"`)
 	pasted := "粘贴 without typing"
-	if _, err := s.Act(ctx, windowsTarget, []Step{{Action: "focus", Ref: field}, Step{Action: "paste", Text: pasted}}); err != nil {
+	if _, err := s.Act(ctx, windowsTarget, []Step{{Action: "focus", Ref: field}, {Action: "paste", Text: pasted}}); err != nil {
 		t.Fatalf("paste: %v", err)
 	}
 	waitLog(t, p.log, "text "+pasted)

@@ -70,7 +70,7 @@ Json setValue(DWORD pid, const std::string& ref, const std::string& text);
 
 // Landing is where keyboard input to an application goes, read after it is
 // brought forward and before anything is sent: the modal holding it, if any,
-// and the focused element with what it holds now.
+// and, when withValue, the focused element with what it holds now.
 struct Landing {
     Json modal;
     bool takesText = false;
@@ -78,7 +78,7 @@ struct Landing {
     std::wstring before;
     std::function<bool(std::wstring&)> read;
 };
-Landing landing(DWORD pid);
+Landing landing(DWORD pid, bool withValue);
 // refuseHeldText refuses text that would land in a modal on an element that
 // takes none, where a letter can be a dialog's mnemonic.
 void refuseHeldText(const Landing& at);

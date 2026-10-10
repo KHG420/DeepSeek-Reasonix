@@ -385,6 +385,28 @@ void reachable(IUIAutomationElement* el, DWORD pid, const std::string& what) {
     throw Failure{"computer.blocked", what + " is in a window the application has disabled"};
 }
 
+// typedExactly is whether after is before with typed put in at one place,
+// replacing whatever was selected there. Where repeated characters make the
+// changed span ambiguous it is taken from either end, and any other change,
+// such as autocomplete or a single-line field dropping a newline, is not it.
+bool typedExactly(const std::wstring& before, const std::wstring& after, const std::wstring& typed) {
+    if (after == before || after.size() < typed.size()) return false;
+    auto span = [&](bool prefixFirst) {
+        size_t p = 0, s = 0, room = std::min(before.size(), after.size());
+        auto prefix = [&] { while (p < room - s && before[p] == after[p]) p++; };
+        auto suffix = [&] { while (s < room - p && before[before.size() - 1 - s] == after[after.size() - 1 - s]) s++; };
+        if (prefixFirst) {
+            prefix();
+            suffix();
+        } else {
+            suffix();
+            prefix();
+        }
+        return after.substr(p, after.size() - p - s);
+    };
+    return span(true) == typed || span(false) == typed;
+}
+
 std::wstring flat(std::wstring s) {
     s.erase(std::remove(s.begin(), s.end(), L'\r'), s.end());
     return s;
@@ -422,7 +444,7 @@ Json effect(const char* cls, const char* evidence, const Json& modal) {
     return Json::object().set("effect", e);
 }
 
-Landing landing(DWORD pid) {
+Landing landing(DWORD pid, bool withValue) {
     need();
     Landing at;
     ComPtr<IUIAutomationElement> focused;
@@ -441,7 +463,7 @@ Landing landing(DWORD pid) {
         el = parent;
     }
     if (at.modal.kind() == Json::Kind::Null && root) at.modal = win32Modal(root, pid);
-    if (!focused) return at;
+    if (!focused || !withValue) return at;
     if (Cached(focused.Get(), UIA_IsValuePatternAvailablePropertyId).flag()) {
         at.takesText = !Cached(focused.Get(), UIA_ValueIsReadOnlyPropertyId).flag();
     } else {
@@ -468,7 +490,7 @@ Json typedEffect(const Landing& at, const std::wstring& typed) {
     std::wstring after, want = flat(typed);
     for (int i = 0; i < 10; i++) {
         if (!at.read(after)) return effect("unverifiable", nullptr, at.modal);
-        if (after != at.before && after.find(want) != std::wstring::npos) return effect("confirmed", "value_readback", at.modal);
+        if (typedExactly(at.before, after, want)) return effect("confirmed", "value_readback", at.modal);
         std::this_thread::sleep_for(std::chrono::milliseconds(40));
     }
     if (after == at.before) return effect("suspected_noop", "value_unchanged", at.modal);

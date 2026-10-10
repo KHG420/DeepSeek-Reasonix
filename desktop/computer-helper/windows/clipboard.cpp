@@ -90,7 +90,7 @@ void clipboardSettle() {
 
 Json paste(DWORD pid, const std::string& text) {
     front(pid);
-    Landing at = landing(pid);
+    Landing at = landing(pid, true);
     refuseHeldText(at);
     clipboardSettle();
     if (!open()) throw Failure{"computer.failed", "another application is holding the clipboard"};

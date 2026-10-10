@@ -130,7 +130,7 @@ void stillFront(DWORD pid, size_t done, size_t total, const char* unit) {
 Json typeText(DWORD pid, const std::string& text) {
     std::wstring units = widen(text);
     front(pid);
-    Landing at = landing(pid);
+    Landing at = landing(pid, true);
     refuseHeldText(at);
     std::vector<INPUT> batch;
     size_t chunk = 0;
@@ -159,7 +159,7 @@ Json typeText(DWORD pid, const std::string& text) {
 Json pressKey(DWORD pid, const std::string& chord, int times) {
     KeyChord c = resolve(chord);
     front(pid);
-    Json modal = landing(pid).modal;
+    Json modal = landing(pid, false).modal;
     std::vector<INPUT> batch;
     for (int i = 0; i < std::clamp(times, 1, 200); i++) {
         stillFront(pid, i, times, "presses");
@@ -175,7 +175,7 @@ Json pressKey(DWORD pid, const std::string& chord, int times) {
 Json holdKey(DWORD pid, const std::string& chord, double seconds) {
     KeyChord c = resolve(chord);
     front(pid);
-    Json modal = landing(pid).modal;
+    Json modal = landing(pid, false).modal;
     std::vector<INPUT> batch;
     chordDown(batch, c);
     send(batch);
